@@ -145,20 +145,53 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.8 0.01 90);
+  background: linear-gradient(oklch(0.82 0.04 80), oklch(0.72 0.06 65));
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.7 0.015 60);
+  background: linear-gradient(oklch(0.72 0.08 70), oklch(0.62 0.1 60));
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: oklch(0.88 0.02 80);
 }
 
 /* کارت‌های KPI */
 .kpi-card {
-  transition: box-shadow 200ms ease, transform 200ms ease;
+  transition: box-shadow 240ms ease, transform 240ms ease, border-color 240ms ease;
+  background: linear-gradient(160deg, oklch(1 0 0), oklch(0.985 0.006 85));
 }
 .kpi-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px -8px oklch(0.4 0.05 60 / 0.15);
+  transform: translateY(-3px);
+  border-color: oklch(0.8 0.07 70);
+  box-shadow:
+    0 14px 32px -12px oklch(0.45 0.09 60 / 0.22),
+    0 0 0 1px oklch(0.85 0.06 70 / 0.35);
+}
+
+/* کارت ایجنت */
+.agent-card:hover {
+  border-color: oklch(0.78 0.1 70);
+  background: linear-gradient(160deg, oklch(0.995 0.008 85), oklch(0.985 0.014 80));
+  box-shadow: 0 8px 20px -10px oklch(0.5 0.1 65 / 0.25);
+  transform: translateY(-1px);
+}
+.agent-card {
+  transition: all 220ms ease;
+}
+
+/* هدر شیشه‌ای */
+.glass-header {
+  background: linear-gradient(to left, oklch(0.975 0.002 90 / 0.92), oklch(0.99 0.004 85 / 0.86));
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: 0 1px 0 oklch(0.9 0.005 90), 0 8px 24px -18px oklch(0.3 0.02 60 / 0.25);
+}
+
+/* هاله پس‌زمینه صفحه */
+.page-glow {
+  background:
+    radial-gradient(900px 320px at 85% -60px, oklch(0.86 0.07 75 / 0.35), transparent 65%),
+    radial-gradient(700px 300px at 10% 0px, oklch(0.92 0.04 160 / 0.25), transparent 60%);
 }
 
 /* پیکان ستون‌های جدول RTL */
@@ -169,20 +202,55 @@
 
 /* انیمیشن ظریف ورود ماژول */
 .view-enter {
-  animation: viewIn 260ms ease-out;
+  animation: viewIn 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes viewIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ورود پیام چت */
+.msg-in { animation: msgIn 240ms ease-out; }
+@keyframes msgIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ورود نتیجه ایجنت */
+.result-in { animation: resultIn 300ms cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes resultIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* درخشش لوگو */
+.brand-glow {
+  background: linear-gradient(135deg, oklch(0.75 0.15 70), oklch(0.66 0.16 55));
+  box-shadow: 0 0 0 1px oklch(0.75 0.12 70 / 0.4), 0 6px 18px -6px oklch(0.7 0.15 65 / 0.55), inset 0 1px 0 oklch(1 0 0 / 0.25);
+  animation: brandPulse 4s ease-in-out infinite;
+}
+@keyframes brandPulse {
+  0%, 100% { box-shadow: 0 0 0 1px oklch(0.75 0.12 70 / 0.4), 0 6px 18px -6px oklch(0.7 0.15 65 / 0.55), inset 0 1px 0 oklch(1 0 0 / 0.25); }
+  50% { box-shadow: 0 0 0 1px oklch(0.78 0.14 70 / 0.55), 0 8px 26px -6px oklch(0.72 0.17 65 / 0.75), inset 0 1px 0 oklch(1 0 0 / 0.3); }
+}
+
+/* آیتم فعال سایدبار */
+.nav-active {
+  background: linear-gradient(to left, oklch(0.72 0.15 65 / 0.22), oklch(0.72 0.15 65 / 0.08));
+  box-shadow: inset -3px 0 0 oklch(0.78 0.14 70);
+}
+.nav-item:hover:not(.nav-active) {
+  background: oklch(0.26 0.014 265 / 0.6);
+}
+
 /* چت هوش مصنوعی */
 .chat-bubble-user {
-  background: linear-gradient(135deg, oklch(0.666 0.157 58), oklch(0.72 0.15 65));
+  background: linear-gradient(135deg, oklch(0.68 0.15 58), oklch(0.62 0.16 45));
   color: white;
+  box-shadow: 0 4px 14px -6px oklch(0.6 0.14 55 / 0.5);
 }
 .chat-bubble-ai {
-  background: oklch(0.985 0.003 90);
+  background: linear-gradient(160deg, oklch(0.995 0.004 90), oklch(0.982 0.008 85));
 }
 
 /* مارک‌داون پاسخ هوش مصنوعی */
@@ -194,9 +262,12 @@
 .erp-md ul { list-style: disc; }
 .erp-md ol { list-style: decimal; }
 .erp-md li { margin: 0.2rem 0; line-height: 1.8; }
-.erp-md strong { font-weight: 700; }
-.erp-md table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.85rem; }
+.erp-md li::marker { color: oklch(0.66 0.14 60); }
+.erp-md strong { font-weight: 700; color: oklch(0.35 0.04 60); }
+.erp-md table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.85rem; border-radius: 8px; overflow: hidden; }
 .erp-md th, .erp-md td { border: 1px solid oklch(0.9 0.005 90); padding: 0.35rem 0.5rem; text-align: right; }
-.erp-md th { background: oklch(0.96 0.01 80); font-weight: 600; }
+.erp-md th { background: linear-gradient(to left, oklch(0.95 0.02 80), oklch(0.93 0.03 75)); font-weight: 700; }
+.erp-md tbody tr:nth-child(even) { background: oklch(0.98 0.006 85); }
 .erp-md hr { margin: 0.75rem 0; border-color: oklch(0.9 0.005 90); }
 .erp-md code { background: oklch(0.95 0.01 80); padding: 0.1rem 0.3rem; border-radius: 4px; font-size: 0.85em; }
+.erp-md blockquote { border-inline-start: 3px solid oklch(0.75 0.12 70); padding-inline-start: 0.8rem; margin: 0.5rem 0; color: oklch(0.45 0.02 260); }

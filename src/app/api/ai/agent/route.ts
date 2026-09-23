@@ -197,11 +197,11 @@ export async function POST(req: NextRequest) {
       { role: 'user', content: dataFor(agentId, payload) + extraContext },
     ];
 
-    const result = await callLLM(messages, 0.55);
+    const { content, engine } = await callLLM(messages, 0.55);
     logActivity(`اجرای ایجنت: ${AGENTS.find(a => a.id === agentId)?.name}`, 'هوش مصنوعی');
-    return NextResponse.json({ result, agent: agentId });
+    return NextResponse.json({ result: content, engine, agent: agentId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'خطای ناشناخته';
-    return NextResponse.json({ error: `اجرای ایجنت ناموفق بود: ${msg}` }, { status: 500 });
+    return NextResponse.json({ error: `اجرای ایجنت ناموفق بود: ${msg}` }, { status: 503 });
   }
 }

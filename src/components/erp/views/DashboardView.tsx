@@ -3,7 +3,7 @@
 // ─── داشبورد مدیریتی ───
 import {
   Car, CarFront, Wrench, KeyRound, TrendingUp, TrendingDown, Wallet,
-  Package, AlertTriangle, BellRing, CircleDollarSign,
+  Package, AlertTriangle, BellRing, CircleDollarSign, Sparkles, CalendarDays,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -60,6 +60,33 @@ export default function DashboardView({ onNavigate }: { onNavigate?: (v: string)
 
   return (
     <div className="view-enter space-y-5">
+      {/* نوار خوش‌آمد */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-amber-500/90 via-amber-600/85 to-orange-600/90 p-5 text-white shadow-lg shadow-amber-500/20">
+        <div className="absolute -top-10 -left-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-14 left-1/3 h-36 w-36 rounded-full bg-orange-300/20 blur-2xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-[11px] font-medium text-amber-100/90">
+              <CalendarDays className="h-3.5 w-3.5" />
+              {jdatetime(new Date().toISOString())}
+            </div>
+            <h2 className="text-lg font-extrabold mt-1">وضعیت مجموعه در یک نگاه</h2>
+            <p className="text-xs text-amber-100/85 mt-0.5">
+              {faNumber(vc.total)} خودرو در ناوگان · {faNumber(data.workshop.openWorkOrders)} سفارش کار باز · {faNumber(data.alerts.length)} هشدار فعال
+            </p>
+          </div>
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('ai')}
+              className="inline-flex items-center gap-2 rounded-xl bg-white/15 border border-white/25 px-4 py-2.5 text-xs font-bold backdrop-blur hover:bg-white/25 transition-all hover:scale-[1.03]"
+            >
+              <Sparkles className="h-4 w-4" />
+              تحلیل لحظه‌ای با هوش مصنوعی
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* ردیف KPI */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard title="خودروهای موجود" value={faNumber(vc.in_stock)} sub={`مجموع ناوگان: ${faNumber(vc.total)}`} icon={Car} tone="amber" />
@@ -119,7 +146,20 @@ export default function DashboardView({ onNavigate }: { onNavigate?: (v: string)
                     <span className="text-muted-foreground">{faNumber(r.value)} خودرو ({faNumber(pct)}٪)</span>
                   </div>
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full rounded-full bg-amber-500" style={{ width: `${pct}%` }} />
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${pct}%`,
+                        background: {
+                          in_stock: 'linear-gradient(90deg,#f59e0b,#fbbf24)',
+                          preparing: 'linear-gradient(90deg,#f97316,#fb923c)',
+                          reserved: 'linear-gradient(90deg,#8b5cf6,#a78bfa)',
+                          sold: 'linear-gradient(90deg,#059669,#34d399)',
+                          rented: 'linear-gradient(90deg,#0d9488,#2dd4bf)',
+                          in_repair: 'linear-gradient(90deg,#e11d48,#fb7185)',
+                        }[r.key] || '#f59e0b',
+                      }}
+                    />
                   </div>
                 </div>
               );

@@ -22,7 +22,6 @@ const initialData = (): ERPData => ({
   transactions: JSON.parse(JSON.stringify(transactions)),
   activityLogs: JSON.parse(JSON.stringify(activityLogs)),
   employees: JSON.parse(JSON.stringify(employees)),
-  aiSettings: { provider: 'built-in' },
 });
 
 const ENTITIES = [

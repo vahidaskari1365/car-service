@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import {
   LayoutDashboard, Car, Handshake, Wrench, KeyRound, CreditCard,
   Package, Users, ShoppingCart, GitBranch, Wallet, BarChart3,
-  Bot, Settings2, Menu, X, Bell, CarFront, Sparkles,
+  Bot, Menu, X, Bell, CarFront, Sparkles,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useDashboard } from '@/components/erp/use-erp';
@@ -22,7 +22,6 @@ import WorkflowView from '@/components/erp/views/WorkflowView';
 import FinanceView from '@/components/erp/views/FinanceView';
 import ReportsView from '@/components/erp/views/ReportsView';
 import AIAssistantView from '@/components/erp/views/AIAssistantView';
-import AISettingsView from '@/components/erp/views/AISettingsView';
 
 const NAV = [
   { id: 'dashboard', label: 'داشبورد مدیریتی', icon: LayoutDashboard, group: 'مدیریت' },
@@ -38,7 +37,6 @@ const NAV = [
   { id: 'finance', label: 'امور مالی', icon: Wallet, group: 'پشتیبانی' },
   { id: 'reports', label: 'گزارش‌ها و عملکرد', icon: BarChart3, group: 'مدیریت' },
   { id: 'ai', label: 'دستیار هوشمند AI', icon: Bot, group: 'هوش مصنوعی' },
-  { id: 'ai-settings', label: 'تنظیمات موتور AI', icon: Settings2, group: 'هوش مصنوعی' },
 ];
 
 const GROUPS = ['مدیریت', 'عملیات', 'پشتیبانی', 'هوش مصنوعی'];
@@ -62,8 +60,8 @@ export default function Home() {
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       {/* لوگو */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-border">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400">
-          <CarFront className="h-5.5 w-5.5 h-6 w-6" />
+        <div className="brand-glow flex h-10 w-10 items-center justify-center rounded-xl text-white">
+          <CarFront className="h-6 w-6" />
         </div>
         <div>
           <div className="text-sm font-extrabold text-white">سامانه جامع مدیریت خودرو</div>
@@ -84,20 +82,20 @@ export default function Home() {
                   <button
                     key={item.id}
                     onClick={() => navigate(item.id)}
-                    className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors ${
+                    className={`nav-item group w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-all duration-200 ${
                       active
-                        ? 'bg-amber-500/15 text-amber-300 font-bold'
-                        : 'text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        ? 'nav-active text-amber-300 font-bold'
+                        : 'text-sidebar-foreground/75 hover:text-sidebar-accent-foreground'
                     }`}
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <Icon className={`h-4 w-4 shrink-0 transition-transform duration-200 ${active ? 'scale-110' : 'group-hover:scale-105'}`} />
                     <span className="flex-1 text-right">{item.label}</span>
                     {item.id === 'dashboard' && alertCount > 0 && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500/90 px-1 text-[10px] font-bold text-white">
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500/90 px-1 text-[10px] font-bold text-white shadow-sm shadow-red-500/40">
                         {alertCount}
                       </span>
                     )}
-                    {active && <span className="h-4 w-1 rounded-full bg-amber-400" />}
+                    {active && <span className="h-4 w-1 rounded-full bg-amber-400 shadow-[0_0_8px_oklch(0.8_0.14_75)]" />}
                   </button>
                 );
               })}
@@ -121,7 +119,7 @@ export default function Home() {
   );
 
   return (
-    <div className="min-h-screen flex bg-background" dir="rtl">
+    <div className="min-h-screen flex bg-background page-glow" dir="rtl">
       {/* سایدبار دسکتاپ */}
       <aside className="hidden lg:block w-64 shrink-0 sticky top-0 h-screen">
         {sidebar}
@@ -130,8 +128,8 @@ export default function Home() {
       {/* سایدبار موبایل */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <div className="absolute inset-y-0 right-0 w-72 shadow-xl">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="absolute inset-y-0 right-0 w-72 shadow-2xl animate-in slide-in-from-right duration-300">
             <button onClick={() => setMobileOpen(false)} className="absolute top-4 left-4 z-10 text-sidebar-foreground/60 hover:text-white">
               <X className="h-5 w-5" />
             </button>
@@ -143,7 +141,7 @@ export default function Home() {
       {/* محتوای اصلی */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* هدر */}
-        <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+        <header className="glass-header sticky top-0 z-40 border-b">
           <div className="flex items-center gap-3 px-4 lg:px-6 h-14">
             <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 -ms-2 text-muted-foreground hover:text-foreground">
               <Menu className="h-5 w-5" />
@@ -155,18 +153,18 @@ export default function Home() {
             <div className="flex-1" />
             <button
               onClick={() => navigate('ai')}
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 text-amber-700 px-3 py-1.5 text-xs font-bold hover:bg-amber-500/20 transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-l from-amber-500/15 to-amber-500/5 text-amber-700 border border-amber-500/25 px-3 py-1.5 text-xs font-bold hover:from-amber-500/25 hover:to-amber-500/10 hover:shadow-sm hover:shadow-amber-500/20 transition-all"
             >
               <Sparkles className="h-3.5 w-3.5" /> دستیار هوشمند
             </button>
             <button
               onClick={() => navigate('dashboard')}
-              className="relative p-2 text-muted-foreground hover:text-foreground"
+              className="relative p-2 text-muted-foreground hover:text-foreground transition-colors"
               title="هشدارها"
             >
-              <Bell className="h-4.5 w-4.5 h-5 w-5" />
+              <Bell className="h-5 w-5" />
               {alertCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+                <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white ring-2 ring-background">
                   {alertCount > 9 ? '+۹' : alertCount}
                 </span>
               )}
@@ -188,8 +186,7 @@ export default function Home() {
           {view === 'workflow' && <WorkflowView />}
           {view === 'finance' && <FinanceView />}
           {view === 'reports' && <ReportsView onOpenAI={() => navigate('ai')} />}
-          {view === 'ai' && <AIAssistantView onOpenSettings={() => navigate('ai-settings')} />}
-          {view === 'ai-settings' && <AISettingsView />}
+          {view === 'ai' && <AIAssistantView />}
         </main>
 
         {/* فوتر چسبیده */}

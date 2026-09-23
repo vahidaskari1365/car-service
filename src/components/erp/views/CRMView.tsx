@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { KpiCard, PageHeader, StatusPill, FormDialog, DetailDrawer, LoadingTable, EmptyRow } from '../shared';
 import { useEntity } from '../use-erp';
 import type { Customer, Deal, Rental, WorkOrder, Vehicle, InstallmentContract } from '@/lib/erp-types';
-import { moneyShort, faNumber, jdate, segmentLabels, uid } from '@/lib/erp-utils';
+import { moneyShort, faNumber, jdate, segmentLabels, uid, insStatusLabels } from '@/lib/erp-utils';
 
 const segTone: Record<string, string> = {
   vip: 'bg-amber-50 text-amber-700 border-amber-200',

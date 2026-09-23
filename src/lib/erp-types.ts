@@ -297,16 +297,6 @@ export interface Employee {
   active: boolean;
 }
 
-// ─── تنظیمات هوش مصنوعی ───
-
-export interface AIProviderSettings {
-  provider: 'built-in' | 'custom';
-  name?: string;
-  baseUrl?: string;
-  apiKey?: string;
-  model?: string;
-}
-
 export interface ERPData {
   vehicles: Vehicle[];
   customers: Customer[];

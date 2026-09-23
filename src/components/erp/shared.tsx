@@ -13,23 +13,24 @@ export function KpiCard({
   title: string; value: string; sub?: string; icon: LucideIcon;
   tone?: 'amber' | 'emerald' | 'red' | 'teal' | 'zinc' | 'orange';
 }) {
-  const tones: Record<string, string> = {
-    amber: 'bg-amber-100 text-amber-700',
-    emerald: 'bg-emerald-100 text-emerald-700',
-    red: 'bg-red-100 text-red-700',
-    teal: 'bg-teal-100 text-teal-700',
-    zinc: 'bg-zinc-200 text-zinc-700',
-    orange: 'bg-orange-100 text-orange-700',
+  const tones: Record<string, { bubble: string; ring: string }> = {
+    amber: { bubble: 'bg-gradient-to-br from-amber-100 to-amber-200/70 text-amber-700', ring: 'hover:shadow-amber-500/15' },
+    emerald: { bubble: 'bg-gradient-to-br from-emerald-100 to-emerald-200/70 text-emerald-700', ring: 'hover:shadow-emerald-500/15' },
+    red: { bubble: 'bg-gradient-to-br from-red-100 to-red-200/70 text-red-700', ring: 'hover:shadow-red-500/15' },
+    teal: { bubble: 'bg-gradient-to-br from-teal-100 to-teal-200/70 text-teal-700', ring: 'hover:shadow-teal-500/15' },
+    zinc: { bubble: 'bg-gradient-to-br from-zinc-200 to-zinc-300/60 text-zinc-700', ring: 'hover:shadow-zinc-500/15' },
+    orange: { bubble: 'bg-gradient-to-br from-orange-100 to-orange-200/70 text-orange-700', ring: 'hover:shadow-orange-500/15' },
   };
+  const t = tones[tone];
   return (
-    <Card className="kpi-card border-border/70 shadow-sm">
+    <Card className={`kpi-card border-border/70 shadow-sm hover:shadow-lg ${t.ring}`}>
       <CardContent className="p-4 flex items-center gap-3">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tones[tone]}`}>
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-inner ${t.bubble}`}>
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
           <div className="text-xs text-muted-foreground">{title}</div>
-          <div className="text-base font-bold truncate">{value}</div>
+          <div className="text-base font-bold truncate ltr-num">{value}</div>
           {sub && <div className="text-[11px] text-muted-foreground truncate">{sub}</div>}
         </div>
       </CardContent>
@@ -51,8 +52,8 @@ export function SectionCard({
   title: string; description?: string; action?: ReactNode; children: ReactNode; className?: string;
 }) {
   return (
-    <Card className={`border-border/70 shadow-sm ${className}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-5 py-3.5">
+    <Card className={`border-border/70 shadow-sm hover:shadow-md transition-shadow duration-300 ${className}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-5 py-3.5 bg-gradient-to-l from-muted/40 to-transparent rounded-t-xl">
         <div>
           <h3 className="text-sm font-bold">{title}</h3>
           {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
