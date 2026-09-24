@@ -9,27 +9,30 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow, DetailDrawer } from '../shared';
+import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow, DetailDrawer, FocusBanner, type NavFocus } from '../shared';
 import { useEntity } from '../use-erp';
+import { actorHeader } from '@/lib/actor';
 import { PrintDocDialog, SaleBillDoc } from '../print/print-docs';
 import type { Deal, Vehicle, Customer, Employee } from '@/lib/erp-types';
 import { moneyShort, money, faNumber, jdate, dealStatusLabels, dealTypeLabels, uid } from '@/lib/erp-utils';
 
 const dealTone: Record<string, string> = {
-  draft: 'bg-zinc-50 text-zinc-600 border-zinc-200',
-  negotiating: 'bg-amber-50 text-amber-700 border-amber-200',
-  contracted: 'bg-teal-50 text-teal-700 border-teal-200',
-  delivered: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  cancelled: 'bg-red-50 text-red-600 border-red-200',
+  draft: 'bg-zinc-50 text-zinc-600 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-300 dark:border-zinc-500/30',
+  negotiating: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+  contracted: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+  delivered: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
+  cancelled: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30',
 };
 
-export default function ShowroomView() {
+export default function ShowroomView({ focus, onClearFocus }: { focus?: NavFocus | null; onClearFocus?: () => void }) {
   const { items: deals, loading, create, update } = useEntity<Deal>('deals');
   const { items: vehicles } = useEntity<Vehicle>('vehicles');
   const { items: customers } = useEntity<Customer>('customers');
   const { items: employees } = useEntity<Employee>('employees');
   const { toast } = useToast();
   const [q, setQ] = useState('');
+  // فوکوس موضوعی از داشبورد (مثلاً «فروش این دوره» → معاملات تحویل‌شده)
+  const [statusFilter, setStatusFilter] = useState(() => focus?.topic === 'sold' ? 'delivered' : 'all');
   const [open, setOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [printId, setPrintId] = useState<string | null>(null);
@@ -41,6 +44,7 @@ export default function ShowroomView() {
 
   const filtered = deals.filter(d =>
     `${d.code} ${vName(d.vehicleId)} ${cName(d.customerId)}`.includes(q)
+    && (statusFilter === 'all' || d.status === statusFilter)
   );
 
   const stats = useMemo(() => {
@@ -80,7 +84,7 @@ export default function ShowroomView() {
       const v = vehicles.find(x => x.id === d.vehicleId);
       if (v && d.type === 'sale') {
         await fetch('/api/vehicles', {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          method: 'PUT', headers: { 'Content-Type': 'application/json', ...actorHeader() },
           body: JSON.stringify({ id: v.id, status: 'sold', salePrice: d.price, saleDate: new Date().toISOString(), location: 'تحویل مشتری', customerName: cName(d.customerId) }),
         });
       }
@@ -112,7 +116,22 @@ export default function ShowroomView() {
           <Search className="absolute start-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={q} onChange={e => setQ(e.target.value)} placeholder="جستجوی کد یا نام..." className="ps-8" />
         </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="همه وضعیت‌ها" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">همه وضعیت‌ها</SelectItem>
+            {Object.entries(dealStatusLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
+
+      {focus && (
+        <FocusBanner
+          label={focus.label}
+          description="از داشبورد با موضوع انتخابی شما باز شده است — معاملات فروخته‌شده و تحویل‌شده"
+          onClear={() => { setStatusFilter('all'); onClearFocus?.(); }}
+        />
+      )}
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
@@ -229,7 +248,7 @@ export default function ShowroomView() {
                   const cur = ['draft', 'negotiating', 'contracted', 'delivered'].indexOf(detail.status);
                   return (
                     <div key={st} className="flex items-center gap-1">
-                      <StatusPill label={dealStatusLabels[st]} tone={i <= cur && detail.status !== 'cancelled' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-zinc-50 text-zinc-400 border-zinc-200'} />
+                      <StatusPill label={dealStatusLabels[st]} tone={i <= cur && detail.status !== 'cancelled' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' : 'bg-zinc-50 text-zinc-400 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-500 dark:border-zinc-500/30'} />
                       {i < 3 && <span className="text-zinc-300">←</span>}
                     </div>
                   );

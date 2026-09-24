@@ -9,28 +9,31 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow } from '../shared';
+import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow, FocusBanner, type NavFocus } from '../shared';
 import { useEntity } from '../use-erp';
+import { actorHeader } from '@/lib/actor';
 import JalaliDatePicker from '../jalali-date-picker';
 import { PrintDocDialog, RentalContractDoc } from '../print/print-docs';
 import type { Rental, Vehicle, Customer } from '@/lib/erp-types';
 import { money, moneyShort, faNumber, jdate, rentalStatusLabels, fuelLabels, uid } from '@/lib/erp-utils';
 
 const rentalTone: Record<string, string> = {
-  reserved: 'bg-amber-50 text-amber-700 border-amber-200',
-  active: 'bg-teal-50 text-teal-700 border-teal-200',
-  returned: 'bg-zinc-100 text-zinc-500 border-zinc-200',
-  overdue: 'bg-red-50 text-red-700 border-red-200',
-  cancelled: 'bg-zinc-50 text-zinc-400 border-zinc-200',
+  reserved: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+  active: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+  returned: 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-400 dark:border-zinc-500/30',
+  overdue: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30',
+  cancelled: 'bg-zinc-50 text-zinc-400 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-500 dark:border-zinc-500/30',
 };
 
-export default function RentalView() {
+export default function RentalView({ focus, onClearFocus }: { focus?: NavFocus | null; onClearFocus?: () => void }) {
   const { items: rentals, loading, create, update } = useEntity<Rental>('rentals');
   const { items: vehicles } = useEntity<Vehicle>('vehicles');
   const { items: customers } = useEntity<Customer>('customers');
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [printId, setPrintId] = useState<string | null>(null);
+  // فوکوس موضوعی از داشبورد: «در اجاره» → قراردادهای فعال
+  const [statusFilter, setStatusFilter] = useState(() => focus?.topic === 'active' ? 'active' : 'all');
   const [form, setForm] = useState({ vehicleId: '', customerId: '', startDate: '', endDate: '', dailyRate: '', deposit: '' });
   const printRental = rentals.find(r => r.id === printId) || null;
 
@@ -59,7 +62,7 @@ export default function RentalView() {
       mileageOut: v?.mileage || 0, fuelOut: 'full', damages: [], fines: [], paidAmount: 0,
     } as Partial<Rental>);
     await fetch('/api/vehicles', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json', ...actorHeader() },
       body: JSON.stringify({ id: form.vehicleId, status: 'reserved' }),
     });
     setForm({ vehicleId: '', customerId: '', startDate: '', endDate: '', dailyRate: '', deposit: '' });
@@ -70,7 +73,7 @@ export default function RentalView() {
   async function handOver(r: Rental) {
     await update({ id: r.id, status: 'active' });
     await fetch('/api/vehicles', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json', ...actorHeader() },
       body: JSON.stringify({ id: r.vehicleId, status: 'rented', location: 'تحویل به مشتری اجاره' }),
     });
     toast({ title: 'خودرو تحویل داده شد', description: `${r.code} — ثبت کیلومتر و سوخت انجام شد` });
@@ -90,7 +93,7 @@ export default function RentalView() {
       mileageIn: Number(mileageIn), fuelIn: 'full', damages, paidAmount: Number(paid),
     });
     await fetch('/api/vehicles', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json', ...actorHeader() },
       body: JSON.stringify({ id: r.vehicleId, status: 'in_stock', location: 'پارکینگ ناوگان اجاره', mileage: Number(mileageIn) }),
     });
     toast({ title: 'عودت ثبت شد', description: `${r.code} — دریافت: ${moneyShort(Number(paid))}` });
@@ -116,12 +119,42 @@ export default function RentalView() {
         <KpiCard title="درآمد اجاره" value={moneyShort(stats.income)} icon={Coins} tone="emerald" />
       </div>
 
+      {focus && (
+        <FocusBanner
+          label={focus.label}
+          description="از داشبورد باز شده است — قراردادهای اجاره فعال ناوگان"
+          onClear={() => { setStatusFilter('all'); onClearFocus?.(); }}
+        />
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {[
+          { k: 'all', label: 'همه قراردادها' },
+          { k: 'active', label: `فعال (${faNumber(stats.active)})` },
+          { k: 'overdue', label: `تأخیر (${faNumber(stats.overdue)})` },
+          { k: 'reserved', label: 'رزرو' },
+          { k: 'returned', label: 'عودت‌شده' },
+        ].map(f => (
+          <button
+            key={f.k}
+            onClick={() => setStatusFilter(f.k)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium border transition-all cursor-pointer ${
+              statusFilter === f.k
+                ? 'bg-amber-500/15 border-amber-500/50 text-amber-700 dark:text-amber-300'
+                : 'bg-card border-border text-muted-foreground hover:bg-accent'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* وضعیت ناوگان */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
         {fleet.map(v => {
           const activeRental = rentals.find(r => r.vehicleId === v.id && ['active', 'overdue'].includes(r.status));
           return (
-            <div key={v.id} className={`rounded-xl border p-3.5 shadow-sm ${activeRental?.status === 'overdue' ? 'border-red-300 bg-red-50/50' : activeRental ? 'border-teal-200 bg-teal-50/40' : 'bg-card'}`}>
+            <div key={v.id} className={`rounded-xl border p-3.5 shadow-sm ${activeRental?.status === 'overdue' ? 'border-red-300 bg-red-50/50 dark:border-red-500/40 dark:bg-red-500/10' : activeRental ? 'border-teal-200 bg-teal-50/40 dark:border-teal-500/40 dark:bg-teal-500/10' : 'bg-card'}`}>
               <div className="text-sm font-bold">{v.model}</div>
               <div className="text-[11px] text-muted-foreground mt-0.5">{v.plate}</div>
               <div className="mt-2">
@@ -153,8 +186,8 @@ export default function RentalView() {
           </TableHeader>
           <TableBody>
             {loading && <TableRow><TableCell colSpan={9}><LoadingTable /></TableCell></TableRow>}
-            {!loading && rentals.length === 0 && <EmptyRow colSpan={9} text="قرارداد اجاره‌ای ثبت نشده" />}
-            {!loading && rentals.map(r => (
+            {!loading && rentals.filter(r => statusFilter === 'all' || r.status === statusFilter).length === 0 && <EmptyRow colSpan={9} text="قرارداد اجاره‌ای ثبت نشده" />}
+            {!loading && rentals.filter(r => statusFilter === 'all' || r.status === statusFilter).map(r => (
               <TableRow key={r.id}>
                 <TableCell className="font-mono text-xs" dir="ltr">{r.code}</TableCell>
                 <TableCell className="text-sm font-medium">{vName(r.vehicleId)}</TableCell>

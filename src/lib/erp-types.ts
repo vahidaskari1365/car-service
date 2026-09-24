@@ -299,6 +299,27 @@ export interface Employee {
   active: boolean;
 }
 
+// ─── کاربران سامانه و دسترسی‌ها ───
+export type UserRole = 'admin' | 'manager' | 'accountant' | 'workshop' | 'sales' | 'rental';
+
+export interface UserPerm {
+  view: boolean;
+  create: boolean;
+  edit: boolean;
+  delete: boolean;
+}
+
+export interface AppUser {
+  id: string;
+  username: string;
+  fullName: string;
+  role: UserRole;
+  phone?: string;
+  active: boolean;
+  permissions: Record<string, UserPerm>;   // کلید = شناسه ماژول ناوبری
+  createdAt: string;
+}
+
 export interface ERPData {
   vehicles: Vehicle[];
   customers: Customer[];
@@ -313,4 +334,5 @@ export interface ERPData {
   transactions: Transaction[];
   activityLogs: ActivityLog[];
   employees: Employee[];
+  users: AppUser[];
 }

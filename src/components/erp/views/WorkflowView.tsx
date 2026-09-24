@@ -14,10 +14,10 @@ import type { WorkflowProcess } from '@/lib/erp-types';
 import { faNumber, jdate, jdatetime } from '@/lib/erp-utils';
 
 const stageTone: Record<string, string> = {
-  done: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  in_progress: 'bg-amber-50 text-amber-700 border-amber-200',
-  pending: 'bg-zinc-50 text-zinc-500 border-zinc-200',
-  rejected: 'bg-red-50 text-red-600 border-red-200',
+  done: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
+  in_progress: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+  pending: 'bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-400 dark:border-zinc-500/30',
+  rejected: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30',
 };
 const typeLabels: Record<string, string> = {
   purchase: 'خرید', repair: 'تعمیر', sale: 'فروش', rental: 'اجاره', custom: 'سفارشی',
@@ -189,7 +189,7 @@ export default function WorkflowView() {
           <div className="space-y-4">
             <div className="space-y-2">
               {detail.stages.map((s, i) => (
-                <div key={i} className={`rounded-xl border p-3 ${i === detail.currentStageIndex ? 'border-amber-300 bg-amber-50/40' : ''}`}>
+                <div key={i} className={`rounded-xl border p-3 ${i === detail.currentStageIndex ? 'border-amber-300 bg-amber-50/40 dark:border-amber-500/40 dark:bg-amber-500/10' : ''}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-bold">{faNumber(i + 1)}. {s.name}</div>
                     <StatusPill label={s.status === 'done' ? 'تکمیل' : s.status === 'in_progress' ? 'در جریان' : s.status === 'rejected' ? 'رد شده' : 'در انتظار'} tone={stageTone[s.status]} />

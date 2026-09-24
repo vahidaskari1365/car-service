@@ -16,11 +16,11 @@ import type { Customer, Deal, Rental, WorkOrder, Vehicle, InstallmentContract } 
 import { moneyShort, faNumber, jdate, segmentLabels, uid, insStatusLabels } from '@/lib/erp-utils';
 
 const segTone: Record<string, string> = {
-  vip: 'bg-amber-50 text-amber-700 border-amber-200',
-  loyal: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  regular: 'bg-zinc-50 text-zinc-600 border-zinc-200',
-  new: 'bg-teal-50 text-teal-700 border-teal-200',
-  prospect: 'bg-orange-50 text-orange-700 border-orange-200',
+  vip: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+  loyal: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
+  regular: 'bg-zinc-50 text-zinc-600 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-300 dark:border-zinc-500/30',
+  new: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+  prospect: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30',
 };
 
 export default function CRMView() {

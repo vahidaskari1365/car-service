@@ -3,6 +3,12 @@
 // ─── هوک‌های اتصال به API سامانه ───
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { getActorName } from '@/lib/actor';
+
+/** هدرهای مشترک: ارسال نام کاربر جاری برای ثبت در تراکینگ رویدادها (encode — هدر فقط Latin-1 می‌پذیرد) */
+function actorHeaders(): Record<string, string> {
+  return { 'Content-Type': 'application/json', 'X-User': encodeURIComponent(getActorName()) };
+}
 
 export function useEntity<T extends { id: string }>(entity: string) {
   const [items, setItems] = useState<T[]>([]);
@@ -29,7 +35,7 @@ export function useEntity<T extends { id: string }>(entity: string) {
 
   const create = useCallback(async (data: Partial<T>) => {
     const res = await fetch(`/api/${entity}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+      method: 'POST', headers: actorHeaders(), body: JSON.stringify(data),
     });
     const json = await res.json();
     if (!res.ok) { toast({ title: json.error || 'خطا در ثبت', variant: 'destructive' }); return null; }
@@ -39,7 +45,7 @@ export function useEntity<T extends { id: string }>(entity: string) {
 
   const update = useCallback(async (data: Partial<T> & { id: string }) => {
     const res = await fetch(`/api/${entity}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+      method: 'PUT', headers: actorHeaders(), body: JSON.stringify(data),
     });
     const json = await res.json();
     if (!res.ok) { toast({ title: json.error || 'خطا در ویرایش', variant: 'destructive' }); return null; }
@@ -48,7 +54,7 @@ export function useEntity<T extends { id: string }>(entity: string) {
   }, [entity, refresh]);
 
   const remove = useCallback(async (id: string) => {
-    const res = await fetch(`/api/${entity}?id=${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/${entity}?id=${id}`, { method: 'DELETE', headers: { 'X-User': encodeURIComponent(getActorName()) } });
     if (!res.ok) { toast({ title: 'خطا در حذف', variant: 'destructive' }); return false; }
     await refresh();
     return true;
@@ -64,7 +70,7 @@ export interface DashboardData {
   vehiclePnL: { id: string; label: string; profit: number }[];
   workshop: { openWorkOrders: number; byStatus: Record<string, number>; revenue: number };
   lowStock: { id: string; name: string; code: string; quantity: number; minQuantity: number }[];
-  alerts: { id: string; type: string; title: string; description: string; severity: 'high' | 'medium' | 'low' }[];
+  alerts: { id: string; type: string; title: string; description: string; severity: 'high' | 'medium' | 'low'; view?: string; dueHint?: string }[];
   monthly: { month: string; income: number; expense: number }[];
   activity: { id: string; at: string; by: string; module: string; action: string; details?: string }[];
 }

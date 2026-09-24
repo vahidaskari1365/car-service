@@ -112,7 +112,7 @@ export default function PartsView() {
             {loading && <TableRow><TableCell colSpan={7}><LoadingTable /></TableCell></TableRow>}
             {!loading && filtered.length === 0 && <EmptyRow colSpan={7} text="قطعه‌ای یافت نشد" />}
             {!loading && filtered.map(p => (
-              <TableRow key={p.id} className={p.quantity <= p.minQuantity ? 'bg-red-50/40' : undefined}>
+              <TableRow key={p.id} className={p.quantity <= p.minQuantity ? 'bg-red-50/40 dark:bg-red-500/10' : undefined}>
                 <TableCell className="font-mono text-xs" dir="ltr">{p.code}</TableCell>
                 <TableCell>
                   <div className="text-sm font-medium">{p.name}</div>

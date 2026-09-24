@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { KpiCard, PageHeader, StatusPill, FormDialog, DetailDrawer, LoadingTable, EmptyRow } from '../shared';
+import { KpiCard, PageHeader, StatusPill, FormDialog, DetailDrawer, LoadingTable, EmptyRow, FocusBanner, type NavFocus } from '../shared';
 import JalaliDatePicker from '../jalali-date-picker';
 import { useEntity } from '../use-erp';
 import type { Vehicle, VehicleCost } from '@/lib/erp-types';
@@ -23,11 +23,14 @@ const emptyForm = {
   category: 'showroom', status: 'in_stock', location: 'نمایشگاه', purchasePrice: '', customerName: '',
 };
 
-export default function VehiclesView() {
+export default function VehiclesView({ focus, onClearFocus }: { focus?: NavFocus | null; onClearFocus?: () => void }) {
   const { items: vehicles, loading, create, update, remove } = useEntity<Vehicle>('vehicles');
   const { toast } = useToast();
   const [q, setQ] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  // فوکوس موضوعی از داشبورد: ویو با فیلتر همان موضوع mount می‌شود
+  const [statusFilter, setStatusFilter] = useState(() =>
+    focus?.topic.startsWith('status:') ? (focus.topic.split(':')[1] || 'all') : 'all'
+  );
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -110,6 +113,14 @@ export default function VehiclesView() {
         <KpiCard title="ارزش موجودی (خرید)" value={moneyShort(stats.value)} icon={Car} tone="zinc" />
         <KpiCard title="سود محقق‌شده فروش" value={moneyShort(stats.realized)} icon={Car} tone="teal" />
       </div>
+
+      {focus && (
+        <FocusBanner
+          label={focus.label}
+          description="این فهرست از داشبورد با موضوع انتخابی شما باز شده است"
+          onClear={() => { setStatusFilter('all'); onClearFocus?.(); }}
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="relative flex-1 min-w-52 max-w-xs">

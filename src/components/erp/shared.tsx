@@ -5,42 +5,84 @@ import { ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { type LucideIcon } from 'lucide-react';
+import { type LucideIcon, ChevronLeft, SlidersHorizontal, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+/** فوکوس ناوبری: با کلیک روی KPI/نمودار داشبورد، ماژول مقصد با فیلتر موضوعی باز می‌شود */
+export interface NavFocus {
+  topic: string;
+  label: string;
+  ts: number;
+}
 
 export function KpiCard({
-  title, value, sub, icon: Icon, tone = 'amber',
+  title, value, sub, icon: Icon, tone = 'amber', onClick, hint,
 }: {
   title: string; value: string; sub?: string; icon: LucideIcon;
-  tone?: 'amber' | 'emerald' | 'red' | 'teal' | 'zinc' | 'orange';
+  tone?: 'amber' | 'emerald' | 'red' | 'teal' | 'zinc' | 'orange' | 'violet';
+  onClick?: () => void; hint?: string;
 }) {
-  const tones: Record<string, { bubble: string; ring: string }> = {
-    amber: { bubble: 'bg-gradient-to-br from-amber-100 to-amber-200/70 text-amber-700', ring: 'hover:shadow-amber-500/15' },
-    emerald: { bubble: 'bg-gradient-to-br from-emerald-100 to-emerald-200/70 text-emerald-700', ring: 'hover:shadow-emerald-500/15' },
-    red: { bubble: 'bg-gradient-to-br from-red-100 to-red-200/70 text-red-700', ring: 'hover:shadow-red-500/15' },
-    teal: { bubble: 'bg-gradient-to-br from-teal-100 to-teal-200/70 text-teal-700', ring: 'hover:shadow-teal-500/15' },
-    zinc: { bubble: 'bg-gradient-to-br from-zinc-200 to-zinc-300/60 text-zinc-700', ring: 'hover:shadow-zinc-500/15' },
-    orange: { bubble: 'bg-gradient-to-br from-orange-100 to-orange-200/70 text-orange-700', ring: 'hover:shadow-orange-500/15' },
+  const tones: Record<string, { bubble: string; ring: string; glow: string }> = {
+    amber: { bubble: 'bg-gradient-to-br from-amber-100 to-amber-200/70 text-amber-700 dark:from-amber-500/20 dark:to-amber-500/10 dark:text-amber-300', ring: 'hover:shadow-amber-500/15', glow: 'group-hover:shadow-[0_0_18px_-4px] group-hover:shadow-amber-400/50' },
+    emerald: { bubble: 'bg-gradient-to-br from-emerald-100 to-emerald-200/70 text-emerald-700 dark:from-emerald-500/20 dark:to-emerald-500/10 dark:text-emerald-300', ring: 'hover:shadow-emerald-500/15', glow: 'group-hover:shadow-[0_0_18px_-4px] group-hover:shadow-emerald-400/50' },
+    red: { bubble: 'bg-gradient-to-br from-red-100 to-red-200/70 text-red-700 dark:from-red-500/20 dark:to-red-500/10 dark:text-red-300', ring: 'hover:shadow-red-500/15', glow: 'group-hover:shadow-[0_0_18px_-4px] group-hover:shadow-red-400/50' },
+    teal: { bubble: 'bg-gradient-to-br from-teal-100 to-teal-200/70 text-teal-700 dark:from-teal-500/20 dark:to-teal-500/10 dark:text-teal-300', ring: 'hover:shadow-teal-500/15', glow: 'group-hover:shadow-[0_0_18px_-4px] group-hover:shadow-teal-400/50' },
+    zinc: { bubble: 'bg-gradient-to-br from-zinc-200 to-zinc-300/60 text-zinc-700 dark:from-zinc-500/20 dark:to-zinc-500/10 dark:text-zinc-300', ring: 'hover:shadow-zinc-500/15', glow: 'group-hover:shadow-[0_0_18px_-4px] group-hover:shadow-zinc-400/50' },
+    orange: { bubble: 'bg-gradient-to-br from-orange-100 to-orange-200/70 text-orange-700 dark:from-orange-500/20 dark:to-orange-500/10 dark:text-orange-300', ring: 'hover:shadow-orange-500/15', glow: 'group-hover:shadow-[0_0_18px_-4px] group-hover:shadow-orange-400/50' },
+    violet: { bubble: 'bg-gradient-to-br from-violet-100 to-violet-200/70 text-violet-700 dark:from-violet-500/20 dark:to-violet-500/10 dark:text-violet-300', ring: 'hover:shadow-violet-500/15', glow: 'group-hover:shadow-[0_0_18px_-4px] group-hover:shadow-violet-400/50' },
   };
   const t = tones[tone];
+  const clickable = !!onClick;
+  const Comp = clickable ? 'button' : 'div';
   return (
-    <Card className={`kpi-card border-border/70 shadow-sm hover:shadow-lg ${t.ring}`}>
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-inner ${t.bubble}`}>
-          <Icon className="h-5 w-5" />
-        </div>
+    <Comp
+      onClick={onClick}
+      type={clickable ? 'button' : undefined}
+      title={clickable ? (hint || `مشاهده ${title}`) : undefined}
+      className={`group text-start w-full ${clickable ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 rounded-xl' : ''}`}
+    >
+      <Card className={`kpi-card border-border/70 shadow-sm ${clickable ? 'hover:shadow-lg' : ''} ${t.ring}`}>
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-inner transition-transform duration-300 group-hover:scale-110 ${t.bubble} ${clickable ? t.glow : ''}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-muted-foreground">{title}</div>
+            <div className="text-base font-bold truncate ltr-num">{value}</div>
+            {sub && <div className="text-[11px] text-muted-foreground truncate">{sub}</div>}
+          </div>
+          {clickable && (
+            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-all duration-300 group-hover:text-amber-500 group-hover:-translate-x-0.5" />
+          )}
+        </CardContent>
+      </Card>
+    </Comp>
+  );
+}
+
+/** بنر فوکوس موضوعی — بالای ماژول مقصد نمایش داده می‌شود */
+export function FocusBanner({ label, description, onClear }: { label: string; description?: string; onClear: () => void }) {
+  return (
+    <div className="focus-banner mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-gradient-to-l from-amber-500/15 via-amber-500/5 to-transparent px-4 py-2.5 shadow-sm">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-300">
+          <SlidersHorizontal className="h-4 w-4" />
+        </span>
         <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">{title}</div>
-          <div className="text-base font-bold truncate ltr-num">{value}</div>
-          {sub && <div className="text-[11px] text-muted-foreground truncate">{sub}</div>}
+          <div className="text-sm font-bold text-amber-700 dark:text-amber-300 truncate">فیلتر موضوعی: {label}</div>
+          {description && <div className="text-[11px] text-muted-foreground truncate">{description}</div>}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={onClear}>
+        <X className="h-3.5 w-3.5" /> حذف فیلتر
+      </Button>
+    </div>
   );
 }
 
 export function StatusPill({ label, tone }: { label: string; tone?: string }) {
   return (
-    <Badge variant="outline" className={`text-[11px] px-2 py-0.5 ${tone || 'bg-zinc-50 text-zinc-700 border-zinc-200'}`}>
+    <Badge variant="outline" className={`text-[11px] px-2 py-0.5 ${tone || 'bg-zinc-50 text-zinc-700 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-300 dark:border-zinc-500/30'}`}>
       {label}
     </Badge>
   );

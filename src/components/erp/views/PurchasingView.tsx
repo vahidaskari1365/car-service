@@ -15,12 +15,12 @@ import type { PurchaseRequest, Part, Supplier, Quote } from '@/lib/erp-types';
 import { money, moneyShort, faNumber, jdate, purchaseStatusLabels, uid } from '@/lib/erp-utils';
 
 const prTone: Record<string, string> = {
-  draft: 'bg-zinc-50 text-zinc-600 border-zinc-200',
-  pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
-  approved: 'bg-teal-50 text-teal-700 border-teal-200',
-  rejected: 'bg-red-50 text-red-600 border-red-200',
-  ordered: 'bg-orange-50 text-orange-700 border-orange-200',
-  received: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  draft: 'bg-zinc-50 text-zinc-600 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-300 dark:border-zinc-500/30',
+  pending_approval: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+  approved: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+  rejected: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30',
+  ordered: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30',
+  received: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
   paid: 'bg-zinc-100 text-zinc-500 border-zinc-200',
 };
 
@@ -231,7 +231,7 @@ export default function PurchasingView() {
                 {detail.quotes.map((q, i) => {
                   const best = Math.min(...detail.quotes.map(x => x.price));
                   return (
-                    <div key={i} className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs ${q.price === best && detail.quotes.length > 1 ? 'border-emerald-300 bg-emerald-50/50' : ''}`}>
+                    <div key={i} className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs ${q.price === best && detail.quotes.length > 1 ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-500/40 dark:bg-emerald-500/10' : ''}`}>
                       <span className="font-medium">{sName(q.supplierId)}</span>
                       <div className="flex items-center gap-3">
                         <span className="text-muted-foreground">ارسال: {faNumber(q.leadDays)} روز</span>

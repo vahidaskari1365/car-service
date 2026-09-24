@@ -77,40 +77,48 @@
   --sidebar-accent-foreground: oklch(0.98 0.02 85);
   --sidebar-border: oklch(0.3 0.012 265);
   --sidebar-ring: oklch(0.666 0.157 58);
+  /* متغیرهای نمودار — تم روشن */
+  --chart-grid: oklch(0.92 0.004 90);
+  --chart-axis: oklch(0.52 0.012 260);
+  --chart-cursor: oklch(0.94 0.01 80 / 0.5);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.165 0.008 260);
+  --foreground: oklch(0.93 0.004 90);
+  --card: oklch(0.215 0.01 260);
+  --card-foreground: oklch(0.93 0.004 90);
+  --popover: oklch(0.225 0.01 260);
+  --popover-foreground: oklch(0.93 0.004 90);
+  --primary: oklch(0.75 0.14 70);
+  --primary-foreground: oklch(0.18 0.02 60);
+  --secondary: oklch(0.27 0.01 260);
+  --secondary-foreground: oklch(0.93 0.004 90);
+  --muted: oklch(0.27 0.01 260);
+  --muted-foreground: oklch(0.68 0.008 90);
+  --accent: oklch(0.29 0.02 70);
+  --accent-foreground: oklch(0.9 0.04 85);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.75 0.14 70);
+  --chart-1: oklch(0.75 0.14 70);
+  --chart-2: oklch(0.7 0.13 163);
+  --chart-3: oklch(0.8 0.13 80);
+  --chart-4: oklch(0.65 0.1 220);
+  --chart-5: oklch(0.7 0.16 15);
+  --sidebar: oklch(0.185 0.008 265);
+  --sidebar-foreground: oklch(0.92 0.005 90);
+  --sidebar-primary: oklch(0.75 0.14 70);
+  --sidebar-primary-foreground: oklch(0.18 0.02 60);
+  --sidebar-accent: oklch(0.27 0.012 265);
+  --sidebar-accent-foreground: oklch(0.98 0.02 85);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.75 0.14 70);
+  /* متغیرهای نمودار — تم تاریک */
+  --chart-grid: oklch(1 0 0 / 8%);
+  --chart-axis: oklch(0.72 0.008 90);
+  --chart-cursor: oklch(1 0 0 / 4%);
 }
 
 @layer base {
@@ -151,8 +159,17 @@
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(oklch(0.72 0.08 70), oklch(0.62 0.1 60));
 }
+.dark ::-webkit-scrollbar-thumb {
+  background: linear-gradient(oklch(0.45 0.05 70), oklch(0.38 0.06 65));
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(oklch(0.55 0.08 70), oklch(0.45 0.1 65));
+}
 .chat-scroll::-webkit-scrollbar-thumb {
   background: oklch(0.88 0.02 80);
+}
+.dark .chat-scroll::-webkit-scrollbar-thumb {
+  background: oklch(0.4 0.02 80);
 }
 
 /* کارت‌های KPI */
@@ -167,6 +184,15 @@
     0 14px 32px -12px oklch(0.45 0.09 60 / 0.22),
     0 0 0 1px oklch(0.85 0.06 70 / 0.35);
 }
+.dark .kpi-card {
+  background: linear-gradient(160deg, oklch(0.235 0.012 260), oklch(0.215 0.01 260));
+}
+.dark .kpi-card:hover {
+  border-color: oklch(0.75 0.12 70 / 0.55);
+  box-shadow:
+    0 14px 32px -12px oklch(0.05 0 0 / 0.6),
+    0 0 0 1px oklch(0.75 0.12 70 / 0.3);
+}
 
 /* کارت ایجنت */
 .agent-card:hover {
@@ -178,6 +204,11 @@
 .agent-card {
   transition: all 220ms ease;
 }
+.dark .agent-card:hover {
+  border-color: oklch(0.75 0.12 70 / 0.5);
+  background: linear-gradient(160deg, oklch(0.25 0.014 260), oklch(0.23 0.012 260));
+  box-shadow: 0 8px 20px -10px oklch(0.05 0 0 / 0.5);
+}
 
 /* هدر شیشه‌ای */
 .glass-header {
@@ -186,12 +217,21 @@
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
   box-shadow: 0 1px 0 oklch(0.9 0.005 90), 0 8px 24px -18px oklch(0.3 0.02 60 / 0.25);
 }
+.dark .glass-header {
+  background: linear-gradient(to left, oklch(0.185 0.008 260 / 0.88), oklch(0.21 0.01 260 / 0.82));
+  box-shadow: 0 1px 0 oklch(1 0 0 / 8%), 0 8px 24px -18px oklch(0 0 0 / 0.6);
+}
 
 /* هاله پس‌زمینه صفحه */
 .page-glow {
   background:
     radial-gradient(900px 320px at 85% -60px, oklch(0.86 0.07 75 / 0.35), transparent 65%),
     radial-gradient(700px 300px at 10% 0px, oklch(0.92 0.04 160 / 0.25), transparent 60%);
+}
+.dark .page-glow {
+  background:
+    radial-gradient(900px 320px at 85% -60px, oklch(0.55 0.09 70 / 0.14), transparent 65%),
+    radial-gradient(700px 300px at 10% 0px, oklch(0.5 0.06 170 / 0.1), transparent 60%);
 }
 
 /* پیکان ستون‌های جدول RTL */
@@ -252,6 +292,9 @@
 .chat-bubble-ai {
   background: linear-gradient(160deg, oklch(0.995 0.004 90), oklch(0.982 0.008 85));
 }
+.dark .chat-bubble-ai {
+  background: linear-gradient(160deg, oklch(0.24 0.012 260), oklch(0.22 0.01 260));
+}
 
 /* ─── چاپ اسناد (فاکتور و قرارداد) ─── */
 @media print {
@@ -301,3 +344,9 @@
 .erp-md hr { margin: 0.75rem 0; border-color: oklch(0.9 0.005 90); }
 .erp-md code { background: oklch(0.95 0.01 80); padding: 0.1rem 0.3rem; border-radius: 4px; font-size: 0.85em; }
 .erp-md blockquote { border-inline-start: 3px solid oklch(0.75 0.12 70); padding-inline-start: 0.8rem; margin: 0.5rem 0; color: oklch(0.45 0.02 260); }
+.dark .erp-md strong { color: oklch(0.85 0.06 80); }
+.dark .erp-md th, .dark .erp-md td { border-color: oklch(1 0 0 / 12%); }
+.dark .erp-md th { background: linear-gradient(to left, oklch(0.3 0.02 70), oklch(0.27 0.018 70)); }
+.dark .erp-md tbody tr:nth-child(even) { background: oklch(1 0 0 / 3%); }
+.dark .erp-md code { background: oklch(1 0 0 / 8%); }
+.dark .erp-md blockquote { color: oklch(0.75 0.01 260); }

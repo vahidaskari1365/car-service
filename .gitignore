@@ -64,3 +64,4 @@ server.log
 /prisma/dev.db*
 *.png.bak
 shot-*.png
+scripts/verify-*.png

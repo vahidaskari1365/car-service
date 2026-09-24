@@ -11,9 +11,9 @@ import type { ErpAlert } from '@/lib/notifications';
 const READ_KEY = 'erp-read-alerts-v1';
 
 const severityStyle: Record<string, { dot: string; icon: typeof Info; ring: string }> = {
-  high: { dot: 'bg-red-500', icon: AlertOctagon, ring: 'bg-red-50/70 border-red-100' },
-  medium: { dot: 'bg-amber-500', icon: AlertTriangle, ring: 'bg-amber-50/60 border-amber-100' },
-  low: { dot: 'bg-teal-500', icon: Info, ring: 'bg-teal-50/50 border-teal-100' },
+  high: { dot: 'bg-red-500', icon: AlertOctagon, ring: 'bg-red-50/70 border-red-100 dark:bg-red-500/10 dark:border-red-500/30' },
+  medium: { dot: 'bg-amber-500', icon: AlertTriangle, ring: 'bg-amber-50/60 border-amber-100 dark:bg-amber-500/10 dark:border-amber-500/30' },
+  low: { dot: 'bg-teal-500', icon: Info, ring: 'bg-teal-50/50 border-teal-100 dark:bg-teal-500/10 dark:border-teal-500/30' },
 };
 
 export default function NotificationCenter({ onNavigate }: { onNavigate?: (view: string) => void }) {
@@ -129,7 +129,7 @@ export default function NotificationCenter({ onNavigate }: { onNavigate?: (view:
                     {a.dueHint && (
                       <span className={cn(
                         'text-[9px] rounded-full px-1.5 py-0.5 border',
-                        a.dueHint.includes('گذشته') ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200',
+                        a.dueHint.includes('گذشته') ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
                       )}>{a.dueHint}</span>
                     )}
                   </div>

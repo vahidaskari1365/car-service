@@ -1,8 +1,9 @@
 // ─── داده‌های اولیه (Seed) — مجموعه نمونه خودرویی ───
 import type {
   Vehicle, Customer, Employee, Deal, WorkOrder, Rental, InstallmentContract,
-  Part, Supplier, PurchaseRequest, WorkflowProcess, Transaction, ActivityLog,
+  Part, Supplier, PurchaseRequest, WorkflowProcess, Transaction, ActivityLog, AppUser,
 } from './erp-types';
+import { defaultPermissionsFor } from './permissions';
 
 function iso(daysAgo: number, hour = 10): string {
   const d = new Date(Date.now() - daysAgo * 86400000);
@@ -29,6 +30,16 @@ export const employees: Employee[] = [
   { id: 'e8', name: 'فاطمه حسینی', role: 'مدیر مالی', division: 'مالی', phone: '۰۹۱۲۸۸۹۹۰۰۱۱', active: true },
   { id: 'e9', name: 'امیر قاسمی', role: 'مسئول اجاره و ناوگان', division: 'اجاره', phone: '۰۹۱۲۹۹۰۰۱۱۲۲', active: true },
   { id: 'e10', name: 'نگار صادقی', role: 'کارشناس اعتبارسنجی و لیزینگ', division: 'اقساط', phone: '۰۹۱۲۱۰۲۰۳۰۴۰', active: true },
+];
+
+// ─── کاربران سامانه (بدون پسورد — بر اساس درخواست، فقط مدیریت دسترسی) ───
+export const appUsers: AppUser[] = [
+  { id: 'u1', username: 'vahid', fullName: 'وحید عسکری', role: 'admin', phone: '۰۹۱۲۱۱۱۲۲۳۳', active: true, permissions: defaultPermissionsFor('admin'), createdAt: iso(90) },
+  { id: 'u2', username: 'saeed', fullName: 'سعید محمدی', role: 'manager', phone: '۰۹۱۲۲۲۳۳۴۴۵', active: true, permissions: defaultPermissionsFor('manager'), createdAt: iso(80) },
+  { id: 'u3', username: 'fateme', fullName: 'فاطمه حسینی', role: 'accountant', phone: '۰۹۱۲۸۸۹۹۰۰۱۱', active: true, permissions: defaultPermissionsFor('accountant'), createdAt: iso(70) },
+  { id: 'u4', username: 'mehdi', fullName: 'مهدی رضایی', role: 'workshop', phone: '۰۹۱۲۴۴۵۵۶۶۷', active: true, permissions: defaultPermissionsFor('workshop'), createdAt: iso(60) },
+  { id: 'u5', username: 'reza', fullName: 'رضا کریمی', role: 'sales', phone: '۰۹۱۹۳۳۴۴۵۵۶', active: true, permissions: defaultPermissionsFor('sales'), createdAt: iso(50) },
+  { id: 'u6', username: 'amir', fullName: 'امیر قاسمی', role: 'rental', phone: '۰۹۱۲۹۹۰۰۱۱۲۲', active: true, permissions: defaultPermissionsFor('rental'), createdAt: iso(40) },
 ];
 
 export const vehicles: Vehicle[] = [

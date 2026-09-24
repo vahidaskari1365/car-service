@@ -9,24 +9,25 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, DetailDrawer } from '../shared';
+import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, DetailDrawer, FocusBanner, type NavFocus } from '../shared';
 import { useEntity } from '../use-erp';
+import { actorHeader } from '@/lib/actor';
 import { PrintDocDialog, WorkshopInvoiceDoc } from '../print/print-docs';
 import type { WorkOrder, Vehicle, Employee, Part, WorkOrderLog, Customer } from '@/lib/erp-types';
 import { money, moneyShort, faNumber, jdate, jdatetime, woStatusLabels, woTypeLabels, workOrderTotal, uid } from '@/lib/erp-utils';
 
 const STAGES: WorkOrder['status'][] = ['received', 'diagnosis', 'awaiting_approval', 'in_repair', 'quality_control', 'ready', 'delivered'];
 const stageTone: Record<string, string> = {
-  received: 'bg-zinc-50 text-zinc-600 border-zinc-200',
-  diagnosis: 'bg-orange-50 text-orange-700 border-orange-200',
-  awaiting_approval: 'bg-amber-50 text-amber-700 border-amber-200',
-  in_repair: 'bg-red-50 text-red-700 border-red-200',
-  quality_control: 'bg-teal-50 text-teal-700 border-teal-200',
-  ready: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  delivered: 'bg-zinc-100 text-zinc-500 border-zinc-200',
+  received: 'bg-zinc-50 text-zinc-600 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-300 dark:border-zinc-500/30',
+  diagnosis: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30',
+  awaiting_approval: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+  in_repair: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30',
+  quality_control: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+  ready: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
+  delivered: 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-400 dark:border-zinc-500/30',
 };
 
-export default function WorkshopView() {
+export default function WorkshopView({ focus, onClearFocus }: { focus?: NavFocus | null; onClearFocus?: () => void }) {
   const { items: workOrders, loading, create, update, refresh } = useEntity<WorkOrder>('workOrders');
   const { items: vehicles } = useEntity<Vehicle>('vehicles');
   const { items: employees } = useEntity<Employee>('employees');
@@ -38,6 +39,8 @@ export default function WorkshopView() {
   const [printId, setPrintId] = useState<string | null>(null);
   const [form, setForm] = useState({ vehicleId: '', type: 'mechanic', complaint: '', technicianId: 'e5' });
   const [partId, setPartId] = useState('');
+  // فوکوس موضوعی از داشبورد: «در تعمیرگاه» → سفارش‌های کار باز
+  const [stageFilter, setStageFilter] = useState(() => focus?.topic === 'open' ? 'open' : 'all');
 
   const vName = (id: string) => { const v = vehicles.find(x => x.id === id); return v ? `${v.brand} ${v.model} (${faNumber(v.year)})` : '—'; };
   const eName = (id?: string) => employees.find(x => x.id === id)?.name || '—';
@@ -88,7 +91,7 @@ export default function WorkshopView() {
           amount: workOrderTotal(w), date: new Date().toISOString(), category: 'repair' as const,
         };
         await fetch('/api/vehicles', {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          method: 'PUT', headers: { 'Content-Type': 'application/json', ...actorHeader() },
           body: JSON.stringify({ id: v.id, costs: [...v.costs, cost], status: v.status === 'in_repair' ? 'in_stock' : v.status, preparationStatus: w.type === 'preparation' ? 'done' : v.preparationStatus }),
         });
       }
@@ -149,10 +152,44 @@ export default function WorkshopView() {
         <KpiCard title="مجموع ساعات کار ثبت‌شده" value={faNumber(stats.hours)} sub="ساعت" icon={Clock} tone="zinc" />
       </div>
 
+      {focus && (
+        <FocusBanner
+          label={focus.label}
+          description="از داشبورد باز شده است — فقط سفارش‌های کار باز (بدون تحویل‌شده)"
+          onClear={() => { setStageFilter('all'); onClearFocus?.(); }}
+        />
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {[
+          { k: 'all', label: 'همه مراحل' },
+          { k: 'open', label: `باز (${faNumber(stats.open)})` },
+          { k: 'in_repair', label: 'در حال تعمیر' },
+          { k: 'ready', label: 'آماده تحویل' },
+          { k: 'delivered', label: 'تحویل‌شده' },
+        ].map(f => (
+          <button
+            key={f.k}
+            onClick={() => setStageFilter(f.k)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium border transition-all cursor-pointer ${
+              stageFilter === f.k
+                ? 'bg-amber-500/15 border-amber-500/50 text-amber-700 dark:text-amber-300'
+                : 'bg-card border-border text-muted-foreground hover:bg-accent'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* خط تولید مراحل */}
       {loading ? <LoadingTable rows={4} /> : (
         <div className="space-y-4">
-          {STAGES.map(stage => {
+          {STAGES.filter(stage =>
+            stageFilter === 'all' ? true
+              : stageFilter === 'open' ? stage !== 'delivered'
+              : stage === stageFilter
+          ).map(stage => {
             const list = workOrders.filter(w => w.status === stage);
             if (list.length === 0) return null;
             return (
@@ -249,7 +286,7 @@ export default function WorkshopView() {
               {detail.complaint}
             </div>
             {detail.diagnosis && (
-              <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-3 text-sm">
+              <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-3 text-sm dark:border-teal-500/40 dark:bg-teal-500/10">
                 <div className="text-[11px] text-teal-700 mb-1">تشخیص فنی</div>
                 {detail.diagnosis}
               </div>
@@ -322,7 +359,7 @@ export default function WorkshopView() {
             </div>
 
             {detail.qualityCheck && (
-              <div className={`rounded-lg border p-3 text-xs ${detail.qualityCheck.passed ? 'border-emerald-200 bg-emerald-50/60' : 'border-red-200 bg-red-50/60'}`}>
+              <div className={`rounded-lg border p-3 text-xs ${detail.qualityCheck.passed ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/40 dark:bg-emerald-500/10' : 'border-red-200 bg-red-50/60 dark:border-red-500/40 dark:bg-red-500/10'}`}>
                 <b>کنترل کیفیت:</b> {detail.qualityCheck.passed ? 'تأیید شد' : 'رد شد'} — {detail.qualityCheck.by}
                 {detail.qualityCheck.notes && <div className="mt-1">{detail.qualityCheck.notes}</div>}
               </div>

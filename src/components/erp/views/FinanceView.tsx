@@ -9,21 +9,27 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow, SectionCard } from '../shared';
+import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow, SectionCard, FocusBanner, type NavFocus } from '../shared';
 import { useEntity } from '../use-erp';
-import type { Transaction, Vehicle } from '@/lib/erp-types';
+import type { Transaction, Vehicle, InstallmentContract, Customer } from '@/lib/erp-types';
 import { money, moneyShort, faNumber, jdate, transactionMethodLabels, vehicleProfit, vehicleCostsTotal } from '@/lib/erp-utils';
 
 const CATEGORIES_EXPENSE = ['خرید خودرو', 'خرید قطعات', 'حقوق و دستمزد', 'اجاره محل', 'تبلیغات', 'بیمه', 'آماده‌سازی خودرو', 'سایر'];
 const CATEGORIES_INCOME = ['فروش خودرو', 'اجاره خودرو', 'تعمیرات', 'اقساط', 'بیعانه', 'سایر'];
 const DIVISIONS = ['نمایشگاه', 'تعمیرگاه', 'اجاره', 'اقساط', 'اداری'];
 
-export default function FinanceView() {
+export default function FinanceView({ focus, onClearFocus }: { focus?: NavFocus | null; onClearFocus?: () => void }) {
   const { items: transactions, loading, create } = useEntity<Transaction>('transactions');
   const { items: vehicles } = useEntity<Vehicle>('vehicles');
+  const { items: installments } = useEntity<InstallmentContract>('installments');
+  const { items: customers } = useEntity<Customer>('customers');
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState('all');
+  // فوکوس موضوعی از داشبورد: درآمد / هزینه / سود / مطالبات
+  const [filter, setFilter] = useState(() =>
+    focus?.topic === 'income' || focus?.topic === 'receivables' ? 'income'
+      : focus?.topic === 'expense' ? 'expense' : 'all'
+  );
   const [form, setForm] = useState({ type: 'expense', category: CATEGORIES_EXPENSE[0], amount: '', division: 'اداری', description: '', method: 'transfer' });
 
   const stats = useMemo(() => ({
@@ -43,6 +49,18 @@ export default function FinanceView() {
     purchase: v.purchasePrice, sale: v.salePrice!, costs: vehicleCostsTotal(v),
     profit: vehicleProfit(v) ?? 0,
   }));
+
+  // مطالبات از اقساط فعال + بدهی تأمین‌کنندگان (برای فوکوس «مطالبات»)
+  const receivableRows = useMemo(() => installments
+    .filter(i => i.status === 'active')
+    .map(i => {
+      const remaining = i.schedule.filter(s => s.status !== 'paid').reduce((a, s) => a + s.amount, 0);
+      const late = i.schedule.filter(s => s.status === 'late').reduce((a, s) => a + s.amount, 0);
+      const paid = i.schedule.filter(s => s.status === 'paid').length;
+      const c = customers.find(x => x.id === i.customerId);
+      return { id: i.id, code: i.code, customer: c ? `${c.firstName} ${c.lastName}` : '—', remaining, late, paid, total: i.schedule.length };
+    })
+    .filter(r => r.remaining > 0), [installments, customers]);
 
   async function handleAdd() {
     if (!form.amount || !form.description) {
@@ -74,6 +92,49 @@ export default function FinanceView() {
         <KpiCard title="سود عملیاتی" value={moneyShort(stats.income - stats.expense)} icon={Wallet} tone="amber" />
         <KpiCard title="دریافتی اقساط" value={moneyShort(receivables.inst.reduce((a, t) => a + t.amount, 0))} icon={Landmark} tone="teal" />
       </div>
+
+      {focus && (
+        <FocusBanner
+          label={focus.label}
+          description={focus.topic === 'receivables' ? 'از داشبورد باز شده — بخش مطالبات اقساطی و وصولی‌ها را ببینید' : 'از داشبورد با موضوع انتخابی شما باز شده است'}
+          onClear={() => { setFilter('all'); onClearFocus?.(); }}
+        />
+      )}
+
+      {/* مطالبات اقساطی — موضوع کارت «مطالبات» داشبورد */}
+      {(focus?.topic === 'receivables' || receivableRows.length > 0) && (
+        <SectionCard
+          title="مطالبات از فروش اقساطی"
+          description={`مانده کل: ${moneyShort(receivableRows.reduce((a, r) => a + r.remaining, 0))} — ${faNumber(receivableRows.length)} قرارداد فعال`}
+          className="mb-6"
+        >
+          <div className="max-h-64 overflow-y-auto">
+            <table className="erp-table w-full text-xs">
+              <thead className="text-muted-foreground border-b">
+                <tr>
+                  <th className="text-right py-2">قرارداد</th>
+                  <th className="text-right py-2">مشتری</th>
+                  <th className="text-right py-2">پرداخت‌شده</th>
+                  <th className="text-right py-2">مانده</th>
+                  <th className="text-right py-2">معوق</th>
+                </tr>
+              </thead>
+              <tbody>
+                {receivableRows.map(r => (
+                  <tr key={r.id} className="border-b last:border-0">
+                    <td className="py-2 font-mono" dir="ltr">{r.code}</td>
+                    <td className="py-2 font-medium">{r.customer}</td>
+                    <td className="py-2 text-muted-foreground">{faNumber(r.paid)} از {faNumber(r.total)} قسط</td>
+                    <td className="py-2 font-bold text-violet-600 dark:text-violet-300">{moneyShort(r.remaining)}</td>
+                    <td className={`py-2 font-bold ${r.late > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>{r.late > 0 ? moneyShort(r.late) : '—'}</td>
+                  </tr>
+                ))}
+                {receivableRows.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">مطالبات اقساطی ثبت نشده</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-4 mb-6">
         <SectionCard title="سود و زیان هر خودرو" description="خرید + هزینه‌ها در مقابل فروش">

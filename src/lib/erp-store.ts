@@ -1,7 +1,7 @@
 // ─── دیتاستور درون‌حافظه‌ای (بدون دیتابیس) ───
 // داده‌ها در حافظه سرور نگهداری می‌شوند و با هر CRUD فوراً به‌روزرسانی می‌شوند.
 import type { ERPData, ActivityLog } from './erp-types';
-import { employees, vehicles, customers, suppliers } from './erp-seed-a';
+import { employees, vehicles, customers, suppliers, appUsers } from './erp-seed-a';
 import {
   deals, workOrders, rentals, installments, parts,
   purchaseRequests, processes, transactions, activityLogs,
@@ -22,12 +22,13 @@ const initialData = (): ERPData => ({
   transactions: JSON.parse(JSON.stringify(transactions)),
   activityLogs: JSON.parse(JSON.stringify(activityLogs)),
   employees: JSON.parse(JSON.stringify(employees)),
+  users: JSON.parse(JSON.stringify(appUsers)),
 });
 
 const ENTITIES = [
   'vehicles', 'customers', 'deals', 'workOrders', 'rentals', 'installments',
   'parts', 'suppliers', 'purchaseRequests', 'processes', 'transactions',
-  'activityLogs', 'employees',
+  'activityLogs', 'employees', 'users',
 ] as const;
 
 export type EntityName = (typeof ENTITIES)[number];
@@ -59,30 +60,54 @@ export function listEntity(name: EntityName): unknown[] {
   return getStore()[name] as unknown[];
 }
 
-export function createEntity(name: EntityName, body: Record<string, unknown>): unknown {
+export function createEntity(name: EntityName, body: Record<string, unknown>, by?: string): unknown {
   const store = getStore();
   const item = { id: uid(), ...body } as Record<string, unknown>;
   (store[name] as unknown[]).unshift(item);
-  logActivity('ثبت رکورد جدید', nameFa(name), `رکورد جدید در ${nameFa(name)} ایجاد شد`);
+  if (name !== 'activityLogs') {
+    logActivity('ثبت رکورد جدید', nameFa(name), `«${recordLabel(item)}» در ${nameFa(name)} ایجاد شد`, by);
+  }
   return item;
 }
 
-export function updateEntity(name: EntityName, id: string, body: Record<string, unknown>): unknown | null {
+export function updateEntity(name: EntityName, id: string, body: Record<string, unknown>, by?: string, changedKeys?: string[]): unknown | null {
   const store = getStore();
   const arr = store[name] as { id: string }[];
   const idx = arr.findIndex(x => x.id === id);
   if (idx === -1) return null;
   arr[idx] = { ...arr[idx], ...body, id };
+  if (name !== 'activityLogs') {
+    const keys = changedKeys && changedKeys.length ? changedKeys.join('، ') : 'فیلدهای ویرایش‌شده';
+    logActivity('ویرایش رکورد', nameFa(name), `«${recordLabel(arr[idx])}» ویرایش شد (${keys})`, by);
+  }
   return arr[idx];
 }
 
-export function deleteEntity(name: EntityName, id: string): boolean {
+export function deleteEntity(name: EntityName, id: string, by?: string): boolean {
   const store = getStore();
   const arr = store[name] as { id: string }[];
   const idx = arr.findIndex(x => x.id === id);
   if (idx === -1) return false;
-  arr.splice(idx, 1);
+  const [removed] = arr.splice(idx, 1);
+  if (name !== 'activityLogs') {
+    logActivity('حذف رکورد', nameFa(name), `«${recordLabel(removed)}» از ${nameFa(name)} حذف شد`, by);
+  }
   return true;
+}
+
+/** استخراج برچسب خوانا از رکورد برای لاگ */
+export function recordLabel(item: unknown): string {
+  const r = item as Record<string, unknown>;
+  if (!r || typeof r !== 'object') return 'بدون عنوان';
+  for (const key of ['title', 'description', 'name', 'fullName', 'code', 'model', 'username']) {
+    if (typeof r[key] === 'string' && r[key]) return r[key] as string;
+  }
+  if (typeof r.firstName === 'string' || typeof r.lastName === 'string') {
+    return `${r.firstName || ''} ${r.lastName || ''}`.trim() || 'بدون عنوان';
+  }
+  if (typeof r.brand === 'string' && r.brand) return String(r.brand);
+  if (typeof r.amount === 'number') return `مبلغ ${r.amount.toLocaleString('fa-IR')}`;
+  return 'بدون عنوان';
 }
 
 export function nameFa(entity: EntityName): string {
@@ -90,22 +115,22 @@ export function nameFa(entity: EntityName): string {
     vehicles: 'خودروها', customers: 'مشتریان', deals: 'معاملات', workOrders: 'سفارش‌های کار',
     rentals: 'اجاره‌ها', installments: 'قراردادهای اقساط', parts: 'قطعات', suppliers: 'تأمین‌کنندگان',
     purchaseRequests: 'درخواست‌های خرید', processes: 'فرآیندها', transactions: 'تراکنش‌ها',
-    activityLogs: 'لاگ فعالیت', employees: 'کارکنان',
+    activityLogs: 'لاگ فعالیت', employees: 'کارکنان', users: 'کاربران سامانه',
   };
   return map[entity];
 }
 
-export function logActivity(action: string, module: string, details?: string): void {
+export function logActivity(action: string, module: string, details?: string, by?: string): void {
   const log: ActivityLog = {
     id: uid('a'),
     at: new Date().toISOString(),
-    by: 'کاربر سیستم',
+    by: by || 'کاربر سیستم',
     module,
     action,
     details,
   };
   getStore().activityLogs.unshift(log);
-  if (getStore().activityLogs.length > 200) getStore().activityLogs.length = 200;
+  if (getStore().activityLogs.length > 500) getStore().activityLogs.length = 500;
 }
 
 // ─── خلاصه داده برای هوش مصنوعی ───

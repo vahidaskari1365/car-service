@@ -9,24 +9,25 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow, DetailDrawer } from '../shared';
+import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow, DetailDrawer, FocusBanner, type NavFocus } from '../shared';
 import { useEntity } from '../use-erp';
+import { actorHeader } from '@/lib/actor';
 import { PrintDocDialog, InstallmentContractDoc } from '../print/print-docs';
 import type { InstallmentContract, Vehicle, Customer, Transaction } from '@/lib/erp-types';
 import { money, moneyShort, faNumber, jdate, insStatusLabels, percent } from '@/lib/erp-utils';
 
 const insTone: Record<string, string> = {
-  applied: 'bg-zinc-50 text-zinc-600 border-zinc-200',
-  credit_check: 'bg-amber-50 text-amber-700 border-amber-200',
-  approved: 'bg-teal-50 text-teal-700 border-teal-200',
-  contracted: 'bg-teal-50 text-teal-700 border-teal-200',
-  active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  completed: 'bg-zinc-100 text-zinc-500 border-zinc-200',
-  rejected: 'bg-red-50 text-red-600 border-red-200',
-  defaulted: 'bg-red-50 text-red-700 border-red-300',
+  applied: 'bg-zinc-50 text-zinc-600 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-300 dark:border-zinc-500/30',
+  credit_check: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+  approved: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+  contracted: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+  active: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
+  completed: 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-400 dark:border-zinc-500/30',
+  rejected: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30',
+  defaulted: 'bg-red-50 text-red-700 border-red-300 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/40',
 };
 
-export default function InstallmentsView() {
+export default function InstallmentsView({ focus, onClearFocus }: { focus?: NavFocus | null; onClearFocus?: () => void }) {
   const { items: contracts, loading, create, update } = useEntity<InstallmentContract>('installments');
   const { items: vehicles } = useEntity<Vehicle>('vehicles');
   const { items: customers } = useEntity<Customer>('customers');
@@ -34,6 +35,10 @@ export default function InstallmentsView() {
   const [open, setOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [printId, setPrintId] = useState<string | null>(null);
+  // فوکوس موضوعی از داشبورد: «مطالبات» / «اقساط فعال» → پرونده‌های فعال
+  const [statusFilter, setStatusFilter] = useState(() =>
+    focus?.topic === 'active' || focus?.topic === 'receivables' ? 'active' : 'all'
+  );
   const [form, setForm] = useState({ customerId: '', vehicleId: '', vehiclePrice: '', downPayment: '', months: '18', interestRate: '23', guarantor: '', creditScore: '' });
 
   const cName = (id: string) => { const c = customers.find(x => x.id === id); return c ? `${c.firstName} ${c.lastName}` : '—'; };
@@ -101,7 +106,7 @@ export default function InstallmentsView() {
     await update({ id: c.id, schedule });
     // ثبت تراکنش مالی
     await fetch('/api/transactions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...actorHeader() },
       body: JSON.stringify({
         type: 'income', category: 'اقساط', amount: row.amount, date: new Date().toISOString(),
         division: 'اقساط', description: `قسط ${no} قرارداد ${c.code} — ${cName(c.customerId)}`, method: 'transfer',
@@ -125,6 +130,35 @@ export default function InstallmentsView() {
         <KpiCard title="اقساط معوق" value={moneyShort(stats.overdue)} icon={AlertTriangle} tone="red" />
       </div>
 
+      {focus && (
+        <FocusBanner
+          label={focus.label}
+          description="از داشبورد باز شده است — پرونده‌های فعال اقساط و مانده مطالبات"
+          onClear={() => { setStatusFilter('all'); onClearFocus?.(); }}
+        />
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {[
+          { k: 'all', label: 'همه پرونده‌ها' },
+          { k: 'active', label: `فعال (${faNumber(stats.active)})` },
+          { k: 'applied', label: 'در جریان بررسی' },
+          { k: 'completed', label: 'تسویه‌شده' },
+        ].map(f => (
+          <button
+            key={f.k}
+            onClick={() => setStatusFilter(f.k)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium border transition-all cursor-pointer ${
+              statusFilter === f.k
+                ? 'bg-amber-500/15 border-amber-500/50 text-amber-700 dark:text-amber-300'
+                : 'bg-card border-border text-muted-foreground hover:bg-accent'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
@@ -141,8 +175,8 @@ export default function InstallmentsView() {
           </TableHeader>
           <TableBody>
             {loading && <TableRow><TableCell colSpan={8}><LoadingTable /></TableCell></TableRow>}
-            {!loading && contracts.length === 0 && <EmptyRow colSpan={8} text="پرونده‌ای ثبت نشده" />}
-            {!loading && contracts.map(c => (
+            {!loading && contracts.filter(c => statusFilter === 'all' || c.status === statusFilter).length === 0 && <EmptyRow colSpan={8} text="پرونده‌ای ثبت نشده" />}
+            {!loading && contracts.filter(c => statusFilter === 'all' || c.status === statusFilter).map(c => (
               <TableRow key={c.id}>
                 <TableCell className="font-mono text-xs" dir="ltr">{c.code}</TableCell>
                 <TableCell className="text-sm font-medium">{cName(c.customerId)}</TableCell>
@@ -245,7 +279,7 @@ export default function InstallmentsView() {
                       <TableCell>
                         <StatusPill
                           label={s.status === 'paid' ? `پرداخت‌شده (${jdate(s.paidDate)})` : s.status === 'late' ? 'معوق' : 'در انتظار'}
-                          tone={s.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : s.status === 'late' ? 'bg-red-50 text-red-700 border-red-200' : undefined}
+                          tone={s.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' : s.status === 'late' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30' : undefined}
                         />
                       </TableCell>
                       <TableCell className="text-center">

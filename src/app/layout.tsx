@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "@/components/theme-provider";
+import { UserProvider } from "@/lib/user-context";
 
 export const metadata: Metadata = {
   title: "سامانه جامع مدیریت مجموعه خودرویی | Car Service ERP",
@@ -24,8 +26,12 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body className="antialiased bg-background text-foreground erp-body">
-        {children}
-        <Toaster />
+        <ThemeProvider>
+          <UserProvider>
+            {children}
+            <Toaster />
+          </UserProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
