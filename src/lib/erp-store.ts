@@ -1,12 +1,42 @@
 // ─── دیتاستور درون‌حافظه‌ای (بدون دیتابیس) ───
 // داده‌ها در حافظه سرور نگهداری می‌شوند و با هر CRUD فوراً به‌روزرسانی می‌شوند.
-import type { ERPData, ActivityLog } from './erp-types';
+import type { ERPData, ActivityLog, FlowDef } from './erp-types';
 import { employees, vehicles, customers, suppliers, appUsers } from './erp-seed-a';
 import {
   deals, workOrders, rentals, installments, parts,
   purchaseRequests, processes, transactions, activityLogs,
 } from './erp-seed-b';
 import { uid } from './erp-utils';
+
+// قالب نمونه طراح فرآیند — آماده تست فوری
+const demoFlow = (): FlowDef => ({
+  id: 'flow-demo-sale',
+  name: 'فرآیند فروش خودرو (نمونه)',
+  description: 'قالب آماده: از درخواست مشتری تا بررسی موجودی، تأیید مدیر، اطلاع‌رسانی و تحویل — با انشعاب شرطی',
+  createdBy: 'سیستم',
+  createdAt: new Date().toISOString(),
+  nodes: [
+    { id: 'n1', kind: 'trigger', label: 'درخواست مشتری', config: { event: 'customer_request' }, x: 30, y: 150 },
+    { id: 'n2', kind: 'task', label: 'بررسی موجودی نمایشگاه', config: { action: 'check_inventory', responsible: 'کارشناس فروش' }, x: 265, y: 150 },
+    { id: 'n3', kind: 'condition', label: 'خودرو آماده فروش هست؟', config: { cond: 'has_stock' }, x: 500, y: 150 },
+    { id: 'n4', kind: 'task', label: 'بررسی مدارک مشتری', config: { action: 'check_customer', responsible: 'کارشناس فروش' }, x: 735, y: 55 },
+    { id: 'n5', kind: 'approval', label: 'تأیید مدیر فروش', config: { approver: 'مدیر فروشگاه' }, x: 970, y: 55 },
+    { id: 'n6', kind: 'notify', label: 'اطلاع به مشتری', config: { channel: 'sms', recipient: '09121234567' }, x: 1205, y: 55 },
+    { id: 'n7', kind: 'task', label: 'ثبت قرارداد فروش', config: { action: 'register_docs', responsible: 'واحد قراردادها' }, x: 1440, y: 55 },
+    { id: 'n8', kind: 'end', label: 'تحویل و پایان', config: {}, x: 1675, y: 55 },
+    { id: 'n9', kind: 'notify', label: 'به مشتری اطلاع بده موجودی نیست', config: { channel: 'app', recipient: 'کارشناس فروش' }, x: 735, y: 265 },
+  ],
+  edges: [
+    { id: 'e1', from: 'n1', to: 'n2' },
+    { id: 'e2', from: 'n2', to: 'n3' },
+    { id: 'e3', from: 'n3', to: 'n4', label: 'بله' },
+    { id: 'e4', from: 'n4', to: 'n5' },
+    { id: 'e5', from: 'n5', to: 'n6' },
+    { id: 'e6', from: 'n6', to: 'n7' },
+    { id: 'e7', from: 'n7', to: 'n8' },
+    { id: 'e8', from: 'n3', to: 'n9', label: 'خیر' },
+  ],
+});
 
 const initialData = (): ERPData => ({
   vehicles: JSON.parse(JSON.stringify(vehicles)),
@@ -23,12 +53,13 @@ const initialData = (): ERPData => ({
   activityLogs: JSON.parse(JSON.stringify(activityLogs)),
   employees: JSON.parse(JSON.stringify(employees)),
   users: JSON.parse(JSON.stringify(appUsers)),
+  flows: [demoFlow()],
 });
 
 const ENTITIES = [
   'vehicles', 'customers', 'deals', 'workOrders', 'rentals', 'installments',
   'parts', 'suppliers', 'purchaseRequests', 'processes', 'transactions',
-  'activityLogs', 'employees', 'users',
+  'activityLogs', 'employees', 'users', 'flows',
 ] as const;
 
 export type EntityName = (typeof ENTITIES)[number];
@@ -116,6 +147,7 @@ export function nameFa(entity: EntityName): string {
     rentals: 'اجاره‌ها', installments: 'قراردادهای اقساط', parts: 'قطعات', suppliers: 'تأمین‌کنندگان',
     purchaseRequests: 'درخواست‌های خرید', processes: 'فرآیندها', transactions: 'تراکنش‌ها',
     activityLogs: 'لاگ فعالیت', employees: 'کارکنان', users: 'کاربران سامانه',
+    flows: 'طراح فرآیند',
   };
   return map[entity];
 }

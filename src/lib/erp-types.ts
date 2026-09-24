@@ -335,4 +335,45 @@ export interface ERPData {
   activityLogs: ActivityLog[];
   employees: Employee[];
   users: AppUser[];
+  flows: FlowDef[];
+}
+
+// ─── طراح گرافیکی فرآیندها (n8n-style) ───
+export type FlowNodeKind =
+  | 'trigger'     // رویداد شروع
+  | 'task'        // عملیات
+  | 'condition'   // شرط / انشعاب
+  | 'approval'    // تأیید مدیر
+  | 'notify'      // اطلاع‌رسانی
+  | 'delay'       // انتظار / تأخیر
+  | 'end';        // پایان
+
+export type FlowNodeState = 'idle' | 'running' | 'success' | 'error' | 'skipped';
+
+export interface FlowNode {
+  id: string;
+  kind: FlowNodeKind;
+  label: string;
+  config: Record<string, string>;
+  x: number;               // موقعیت روی بوم
+  y: number;
+}
+
+export interface FlowEdge {
+  id: string;
+  from: string;
+  to: string;
+  label?: string;          // برای نود شرط: بله / خیر
+}
+
+export interface FlowDef {
+  id: string;
+  name: string;
+  description?: string;
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  createdBy?: string;
+  createdAt: string;
+  lastTestAt?: string;
+  lastTestOk?: boolean;
 }

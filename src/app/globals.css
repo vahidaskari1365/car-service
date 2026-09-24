@@ -350,3 +350,40 @@
 .dark .erp-md tbody tr:nth-child(even) { background: oklch(1 0 0 / 3%); }
 .dark .erp-md code { background: oklch(1 0 0 / 8%); }
 .dark .erp-md blockquote { color: oklch(0.75 0.01 260); }
+
+/* ─── طراح گرافیکی فرآیند (n8n-style) ─── */
+.wf-canvas-bg {
+  background-color: oklch(0.985 0.003 85);
+  background-image: radial-gradient(circle, oklch(0.75 0.01 80 / 35%) 1.1px, transparent 1.1px);
+  background-size: 22px 22px;
+}
+.dark .wf-canvas-bg {
+  background-color: oklch(0.21 0.012 260);
+  background-image: radial-gradient(circle, oklch(0.55 0.01 260 / 30%) 1.1px, transparent 1.1px);
+}
+@keyframes wf-dash { to { stroke-dashoffset: -24; } }
+.wf-edge-active {
+  stroke-dasharray: 8 4;
+  animation: wf-dash 0.55s linear infinite;
+}
+@keyframes wf-pop { 0% { transform: scale(1); } 45% { transform: scale(1.1); } 100% { transform: scale(1); } }
+.wf-pop { animation: wf-pop 0.4s ease; }
+@keyframes wf-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); } 40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); } 80% { transform: translateX(3px); }
+}
+.wf-shake { animation: wf-shake 0.5s ease; }
+@keyframes wf-pulse-ring {
+  0% { box-shadow: 0 0 0 0 oklch(0.77 0.16 70 / 50%); }
+  70% { box-shadow: 0 0 0 13px oklch(0.77 0.16 70 / 0%); }
+  100% { box-shadow: 0 0 0 0 oklch(0.77 0.16 70 / 0%); }
+}
+.wf-running { animation: wf-pulse-ring 1.15s ease-out infinite; }
+.wf-node { transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease; }
+.wf-port { cursor: crosshair; }
+.wf-log-enter { animation: wf-slide-in 0.25s ease; }
+@keyframes wf-slide-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
