@@ -5,8 +5,10 @@ import { useMemo, useState } from 'react';
 import {
   LayoutDashboard, Car, Handshake, Wrench, KeyRound, CreditCard,
   Package, Users, ShoppingCart, GitBranch, Wallet, BarChart3,
-  Bot, Menu, X, Bell, CarFront, Sparkles,
+  Bot, Menu, X, CarFront, Sparkles,
 } from 'lucide-react';
+import GlobalSearch from '@/components/erp/global-search';
+import NotificationCenter from '@/components/erp/notification-center';
 import { Badge } from '@/components/ui/badge';
 import { useDashboard } from '@/components/erp/use-erp';
 import DashboardView from '@/components/erp/views/DashboardView';
@@ -46,7 +48,8 @@ export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: dash } = useDashboard();
 
-  const alertCount = dash?.alerts.length ?? 0;
+  // تعداد هشدارهای بحرانی برای بج سایدبار
+  const alertCount = dash?.alerts.filter(a => a.severity === 'high').length ?? 0;
 
   const current = useMemo(() => NAV.find(n => n.id === view), [view]);
 
@@ -92,7 +95,7 @@ export default function Home() {
                     <span className="flex-1 text-right">{item.label}</span>
                     {item.id === 'dashboard' && alertCount > 0 && (
                       <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500/90 px-1 text-[10px] font-bold text-white shadow-sm shadow-red-500/40">
-                        {alertCount}
+                        {alertCount.toLocaleString('fa-IR')}
                       </span>
                     )}
                     {active && <span className="h-4 w-1 rounded-full bg-amber-400 shadow-[0_0_8px_oklch(0.8_0.14_75)]" />}
@@ -146,29 +149,19 @@ export default function Home() {
             <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 -ms-2 text-muted-foreground hover:text-foreground">
               <Menu className="h-5 w-5" />
             </button>
-            <div className="flex items-center gap-2 min-w-0">
-              {current && <current.icon className="h-4 w-4 text-amber-600 shrink-0" />}
-              <h1 className="text-sm font-bold truncate">{current?.label}</h1>
+            <div className="hidden md:flex items-center gap-2 shrink-0">
+              {current && <current.icon className="h-4 w-4 text-amber-600" />}
+              <h1 className="text-sm font-bold whitespace-nowrap">{current?.label}</h1>
             </div>
             <div className="flex-1" />
+            <GlobalSearch onNavigate={navigate} />
             <button
               onClick={() => navigate('ai')}
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-l from-amber-500/15 to-amber-500/5 text-amber-700 border border-amber-500/25 px-3 py-1.5 text-xs font-bold hover:from-amber-500/25 hover:to-amber-500/10 hover:shadow-sm hover:shadow-amber-500/20 transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-l from-amber-500/15 to-amber-500/5 text-amber-700 border border-amber-500/25 px-3 py-1.5 text-xs font-bold hover:from-amber-500/25 hover:to-amber-500/10 hover:shadow-sm hover:shadow-amber-500/20 transition-all shrink-0"
             >
               <Sparkles className="h-3.5 w-3.5" /> دستیار هوشمند
             </button>
-            <button
-              onClick={() => navigate('dashboard')}
-              className="relative p-2 text-muted-foreground hover:text-foreground transition-colors"
-              title="هشدارها"
-            >
-              <Bell className="h-5 w-5" />
-              {alertCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white ring-2 ring-background">
-                  {alertCount > 9 ? '+۹' : alertCount}
-                </span>
-              )}
-            </button>
+            <NotificationCenter onNavigate={navigate} />
           </div>
         </header>
 

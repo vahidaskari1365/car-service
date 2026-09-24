@@ -2,7 +2,7 @@
 
 // ─── نمایشگاه — خرید و فروش خودرو ───
 import { useMemo, useState } from 'react';
-import { Plus, Search, Handshake, ReceiptText } from 'lucide-react';
+import { Plus, Search, Handshake, ReceiptText, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow, DetailDrawer } from '../shared';
 import { useEntity } from '../use-erp';
+import { PrintDocDialog, SaleBillDoc } from '../print/print-docs';
 import type { Deal, Vehicle, Customer, Employee } from '@/lib/erp-types';
 import { moneyShort, money, faNumber, jdate, dealStatusLabels, dealTypeLabels, uid } from '@/lib/erp-utils';
 
@@ -31,6 +32,7 @@ export default function ShowroomView() {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [printId, setPrintId] = useState<string | null>(null);
   const [form, setForm] = useState({ vehicleId: '', customerId: '', type: 'sale', price: '', commission: '', agentId: 'e2', notes: '' });
 
   const vName = (id: string) => { const v = vehicles.find(x => x.id === id); return v ? `${v.brand} ${v.model}` : '—'; };
@@ -88,6 +90,7 @@ export default function ShowroomView() {
   }
 
   const detail = deals.find(d => d.id === detailId) || null;
+  const printDeal = deals.find(d => d.id === printId) || null;
 
   return (
     <div className="view-enter">
@@ -140,6 +143,9 @@ export default function ShowroomView() {
                 <TableCell>
                   <div className="flex items-center justify-center gap-1">
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setDetailId(d.id)}>جزئیات</Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-teal-700" onClick={() => setPrintId(d.id)} title={d.type === 'sale' ? 'چاپ قبض فروش خودرو' : 'چاپ قبض خرید خودرو'}>
+                      <Printer className="h-3.5 w-3.5" /> قبض
+                    </Button>
                     {!['delivered', 'cancelled'].includes(d.status) && (
                       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => advance(d)}>مرحله بعد</Button>
                     )}
@@ -230,9 +236,26 @@ export default function ShowroomView() {
                 })}
               </div>
             </div>
+            <div>
+              <Button size="sm" variant="outline" className="gap-1 text-teal-700" onClick={() => setPrintId(detail.id)}>
+                <Printer className="h-3.5 w-3.5" /> چاپ {detail.type === 'sale' ? 'قبض فروش' : 'قبض خرید'} خودرو
+              </Button>
+            </div>
           </div>
         )}
       </DetailDrawer>
+
+      {/* چاپ قبض فروش/خرید خودرو */}
+      <PrintDocDialog open={!!printDeal} onOpenChange={v => !v && setPrintId(null)} title={`${printDeal?.type === 'sale' ? 'قبض فروش' : 'قبض خرید'} خودرو ${printDeal?.code || ''}`}>
+        {printDeal && (
+          <SaleBillDoc
+            deal={printDeal}
+            vehicle={vehicles.find(v => v.id === printDeal.vehicleId)}
+            customer={customers.find(c => c.id === printDeal.customerId)}
+            agentName={employees.find(e => e.id === printDeal.agentId)?.name}
+          />
+        )}
+      </PrintDocDialog>
     </div>
   );
 }

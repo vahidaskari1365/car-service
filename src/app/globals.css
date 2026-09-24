@@ -253,6 +253,36 @@
   background: linear-gradient(160deg, oklch(0.995 0.004 90), oklch(0.982 0.008 85));
 }
 
+/* ─── چاپ اسناد (فاکتور و قرارداد) ─── */
+@media print {
+  /* همه فرزندان body به‌جز اورلی سند حذف می‌شوند (بدون فضای خالی) */
+  body > *:not(.print-overlay) {
+    display: none !important;
+  }
+  /* اورلی و سند به جریان عادی برگردند تا صفحات به‌درستی شکسته شوند */
+  .print-overlay {
+    position: static !important;
+    overflow: visible !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+  .print-overlay > div {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  .print-doc-root {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}
+
 /* مارک‌داون پاسخ هوش مصنوعی */
 .erp-md h1, .erp-md h2, .erp-md h3 { font-weight: 700; margin: 0.75rem 0 0.4rem; }
 .erp-md h2 { font-size: 1.05rem; }

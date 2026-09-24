@@ -2,7 +2,7 @@
 
 // ─── فروش اقساطی، لیزینگ و فاینانس ───
 import { useMemo, useState } from 'react';
-import { Plus, CreditCard, Calculator, AlertTriangle, Landmark, Receipt } from 'lucide-react';
+import { Plus, CreditCard, Calculator, AlertTriangle, Landmark, Receipt, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow, DetailDrawer } from '../shared';
 import { useEntity } from '../use-erp';
+import { PrintDocDialog, InstallmentContractDoc } from '../print/print-docs';
 import type { InstallmentContract, Vehicle, Customer, Transaction } from '@/lib/erp-types';
 import { money, moneyShort, faNumber, jdate, insStatusLabels, percent } from '@/lib/erp-utils';
 
@@ -32,11 +33,13 @@ export default function InstallmentsView() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [printId, setPrintId] = useState<string | null>(null);
   const [form, setForm] = useState({ customerId: '', vehicleId: '', vehiclePrice: '', downPayment: '', months: '18', interestRate: '23', guarantor: '', creditScore: '' });
 
   const cName = (id: string) => { const c = customers.find(x => x.id === id); return c ? `${c.firstName} ${c.lastName}` : '—'; };
   const vName = (id: string) => { const v = vehicles.find(x => x.id === id); return v ? `${v.brand} ${v.model}` : '—'; };
   const detail = contracts.find(i => i.id === detailId) || null;
+  const printContract = contracts.find(i => i.id === printId) || null;
 
   const stats = useMemo(() => ({
     active: contracts.filter(c => c.status === 'active').length,
@@ -160,6 +163,9 @@ export default function InstallmentsView() {
                 <TableCell>
                   <div className="flex items-center justify-center gap-1">
                     <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setDetailId(c.id)}>اقساط</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-teal-700" onClick={() => setPrintId(c.id)} title="چاپ قرارداد فروش اقساطی">
+                      <Printer className="h-3.5 w-3.5" /> قرارداد
+                    </Button>
                     {['applied', 'credit_check', 'approved', 'contracted'].includes(c.status) && (
                       <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => advance(c)}>مرحله بعد</Button>
                     )}
@@ -253,9 +259,25 @@ export default function InstallmentsView() {
               </Table>
             </div>
             {detail.guarantor && <div className="text-xs text-muted-foreground">ضامن: {detail.guarantor}</div>}
+            <div>
+              <Button size="sm" variant="outline" className="gap-1 text-teal-700" onClick={() => setPrintId(detail.id)}>
+                <Printer className="h-3.5 w-3.5" /> چاپ قرارداد فروش اقساطی
+              </Button>
+            </div>
           </div>
         )}
       </DetailDrawer>
+
+      {/* چاپ قرارداد اقساط */}
+      <PrintDocDialog open={!!printContract} onOpenChange={v => !v && setPrintId(null)} title={`قرارداد فروش اقساطی ${printContract?.code || ''}`}>
+        {printContract && (
+          <InstallmentContractDoc
+            contract={printContract}
+            vehicle={vehicles.find(v => v.id === printContract.vehicleId)}
+            customer={customers.find(c => c.id === printContract.customerId)}
+          />
+        )}
+      </PrintDocDialog>
     </div>
   );
 }

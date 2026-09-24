@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { KpiCard, PageHeader, StatusPill, FormDialog, DetailDrawer, LoadingTable, EmptyRow } from '../shared';
+import JalaliDatePicker from '../jalali-date-picker';
 import { useEntity } from '../use-erp';
 import type { Vehicle, VehicleCost } from '@/lib/erp-types';
 import {
@@ -252,6 +253,49 @@ export default function VehiclesView() {
               <div><span className="text-muted-foreground">تاریخ فروش:</span> {jdate(detail.saleDate)}</div>
               <div><span className="text-muted-foreground">آماده‌سازی:</span> {detail.preparationStatus === 'done' ? 'تکمیل شده' : detail.preparationStatus === 'in_progress' ? 'در جریان' : 'شروع نشده'}</div>
               <div><span className="text-muted-foreground">مشتری:</span> {detail.customerName || '—'}</div>
+            </div>
+
+            {/* بیمه و معاینه فنی */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">بیمه‌نامه و معاینه فنی</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="rounded-lg border p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium">بیمه‌نامه شخص ثالث</span>
+                    <span className={
+                      !detail.insuranceExpiry ? 'text-muted-foreground'
+                        : new Date(detail.insuranceExpiry) < new Date() ? 'text-red-600 font-bold'
+                        : new Date(detail.insuranceExpiry).getTime() < Date.now() + 30 * 86400000 ? 'text-amber-600 font-bold'
+                        : 'text-emerald-600 font-bold'
+                    }>
+                      {detail.insuranceExpiry ? (new Date(detail.insuranceExpiry) < new Date() ? 'منقضی — ' : '') + jdate(detail.insuranceExpiry) : 'ثبت نشده'}
+                    </span>
+                  </div>
+                  <JalaliDatePicker
+                    value={detail.insuranceExpiry || ''}
+                    onChange={iso => update({ id: detail.id, insuranceExpiry: iso || undefined })}
+                    placeholder="تاریخ انقضای بیمه‌نامه"
+                  />
+                </div>
+                <div className="rounded-lg border p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium">معاینه فنی</span>
+                    <span className={
+                      !detail.inspectionExpiry ? 'text-muted-foreground'
+                        : new Date(detail.inspectionExpiry) < new Date() ? 'text-red-600 font-bold'
+                        : new Date(detail.inspectionExpiry).getTime() < Date.now() + 15 * 86400000 ? 'text-amber-600 font-bold'
+                        : 'text-emerald-600 font-bold'
+                    }>
+                      {detail.inspectionExpiry ? (new Date(detail.inspectionExpiry) < new Date() ? 'منقضی — ' : '') + jdate(detail.inspectionExpiry) : 'ثبت نشده'}
+                    </span>
+                  </div>
+                  <JalaliDatePicker
+                    value={detail.inspectionExpiry || ''}
+                    onChange={iso => update({ id: detail.id, inspectionExpiry: iso || undefined })}
+                    placeholder="تاریخ انقضای معاینه فنی"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>

@@ -27,11 +27,11 @@ export function moneyShort(n: number | undefined | null): string {
   return faNum.format(Math.round(n)) + ' تومان';
 }
 
-/** تاریخ شمسی */
+/** تاریخ شمسی (تقویم فارسی در همه محیط‌ها تضمین می‌شود) */
 export function jdate(iso: string | undefined | null): string {
   if (!iso) return '—';
   try {
-    return new Intl.DateTimeFormat('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+    return new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
   } catch {
     return '—';
   }
@@ -41,7 +41,7 @@ export function jdate(iso: string | undefined | null): string {
 export function jdatetime(iso: string | undefined | null): string {
   if (!iso) return '—';
   try {
-    return new Intl.DateTimeFormat('fa-IR', {
+    return new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
     }).format(new Date(iso));
   } catch {

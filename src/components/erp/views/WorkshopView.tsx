@@ -2,7 +2,7 @@
 
 // ─── تعمیرگاه و خدمات فنی ───
 import { useMemo, useState } from 'react';
-import { Plus, Wrench, ClipboardCheck, Clock, PackageSearch, ArrowLeft } from 'lucide-react';
+import { Plus, Wrench, ClipboardCheck, Clock, PackageSearch, ArrowLeft, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, DetailDrawer } from '../shared';
 import { useEntity } from '../use-erp';
-import type { WorkOrder, Vehicle, Employee, Part, WorkOrderLog } from '@/lib/erp-types';
+import { PrintDocDialog, WorkshopInvoiceDoc } from '../print/print-docs';
+import type { WorkOrder, Vehicle, Employee, Part, WorkOrderLog, Customer } from '@/lib/erp-types';
 import { money, moneyShort, faNumber, jdate, jdatetime, woStatusLabels, woTypeLabels, workOrderTotal, uid } from '@/lib/erp-utils';
 
 const STAGES: WorkOrder['status'][] = ['received', 'diagnosis', 'awaiting_approval', 'in_repair', 'quality_control', 'ready', 'delivered'];
@@ -30,15 +31,18 @@ export default function WorkshopView() {
   const { items: vehicles } = useEntity<Vehicle>('vehicles');
   const { items: employees } = useEntity<Employee>('employees');
   const { items: parts } = useEntity<Part>('parts');
+  const { items: customers } = useEntity<Customer>('customers');
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [printId, setPrintId] = useState<string | null>(null);
   const [form, setForm] = useState({ vehicleId: '', type: 'mechanic', complaint: '', technicianId: 'e5' });
   const [partId, setPartId] = useState('');
 
   const vName = (id: string) => { const v = vehicles.find(x => x.id === id); return v ? `${v.brand} ${v.model} (${faNumber(v.year)})` : '—'; };
   const eName = (id?: string) => employees.find(x => x.id === id)?.name || '—';
   const detail = workOrders.find(w => w.id === detailId) || null;
+  const printWo = workOrders.find(w => w.id === printId) || null;
 
   const stats = useMemo(() => ({
     open: workOrders.filter(w => w.status !== 'delivered').length,
@@ -73,7 +77,7 @@ export default function WorkshopView() {
     const patch: Record<string, unknown> = { status: next, logs: [...w.logs, log] };
     if (next === 'delivered') patch.completedAt = new Date().toISOString();
     if (next === 'in_repair' && !w.diagnosis) patch.diagnosis = 'در حال بررسی توسط تکنسین';
-    await update({ id: w.id, ...patch } as Partial<WorkOrder>);
+    await update({ id: w.id, ...patch } as Partial<WorkOrder> & { id: string });
 
     // اگر تحویل شد، هزینه به‌عنوان هزینه آماده‌سازی/تعمیر به خودرو اضافه شود
     if (next === 'delivered') {
@@ -176,6 +180,9 @@ export default function WorkshopView() {
                         <span className="text-xs font-bold">{w.laborHours > 0 || w.parts.length > 0 ? moneyShort(workOrderTotal(w)) : '—'}</span>
                         <div className="flex gap-1">
                           <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setDetailId(w.id)}>جزئیات</Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-teal-700" onClick={() => setPrintId(w.id)} title="چاپ فاکتور خدمات فنی">
+                            <Printer className="h-3.5 w-3.5" /> فاکتور
+                          </Button>
                           {stage !== 'delivered' && (
                             <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => advance(w)}>
                               مرحله بعد <ArrowLeft className="h-3 w-3" />
@@ -257,6 +264,7 @@ export default function WorkshopView() {
 
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={saveDiagnosis} className="gap-1"><ClipboardCheck className="h-3.5 w-3.5" /> ثبت تشخیص و ساعات کار</Button>
+              <Button size="sm" variant="outline" onClick={() => setPrintId(detail.id)} className="gap-1 text-teal-700"><Printer className="h-3.5 w-3.5" /> چاپ فاکتور خدمات فنی</Button>
               {detail.status !== 'delivered' && (
                 <Button size="sm" onClick={() => advance(detail)} className="gap-1">انتقال به مرحله بعد <ArrowLeft className="h-3.5 w-3.5" /></Button>
               )}
@@ -322,6 +330,18 @@ export default function WorkshopView() {
           </div>
         )}
       </DetailDrawer>
+
+      {/* چاپ فاکتور تعمیرگاه */}
+      <PrintDocDialog open={!!printWo} onOpenChange={v => !v && setPrintId(null)} title={`فاکتور خدمات فنی ${printWo?.code || ''}`}>
+        {printWo && (
+          <WorkshopInvoiceDoc
+            wo={printWo}
+            vehicle={vehicles.find(v => v.id === printWo.vehicleId)}
+            customer={customers.find(c => c.id === printWo.customerId)}
+            parts={parts}
+          />
+        )}
+      </PrintDocDialog>
     </div>
   );
 }

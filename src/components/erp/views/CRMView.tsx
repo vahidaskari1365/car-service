@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { KpiCard, PageHeader, StatusPill, FormDialog, DetailDrawer, LoadingTable, EmptyRow } from '../shared';
+import JalaliDatePicker from '../jalali-date-picker';
 import { useEntity } from '../use-erp';
 import type { Customer, Deal, Rental, WorkOrder, Vehicle, InstallmentContract } from '@/lib/erp-types';
 import { moneyShort, faNumber, jdate, segmentLabels, uid, insStatusLabels } from '@/lib/erp-utils';
@@ -262,9 +263,9 @@ export default function CRMView() {
                     </div>
                   ))}
                 </div>
-                <div className="flex gap-2 mt-3">
-                  <Input placeholder="عنوان پیگیری (تماس، یادآوری...)" value={followUpForm.title} onChange={e => setFollowUpForm({ ...followUpForm, title: e.target.value })} className="flex-1" />
-                  <Input type="date" value={followUpForm.dueDate} onChange={e => setFollowUpForm({ ...followUpForm, dueDate: e.target.value })} className="w-40" />
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Input placeholder="عنوان پیگیری (تماس، یادآوری...)" value={followUpForm.title} onChange={e => setFollowUpForm({ ...followUpForm, title: e.target.value })} className="flex-1 min-w-40" />
+                  <JalaliDatePicker value={followUpForm.dueDate} onChange={iso => setFollowUpForm({ ...followUpForm, dueDate: iso })} placeholder="موعد پیگیری" className="w-44" />
                   <Button size="sm" onClick={addFollowUp}>ثبت</Button>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getStore } from '@/lib/erp-store';
 import { vehicleCostsTotal, workOrderTotal } from '@/lib/erp-utils';
+import { computeAlerts } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,29 +58,8 @@ export async function GET() {
     .filter(p => p.quantity <= p.minQuantity)
     .map(p => ({ id: p.id, name: p.name, code: p.code, quantity: p.quantity, minQuantity: p.minQuantity }));
 
-  const alerts: { id: string; type: string; title: string; description: string; severity: 'high' | 'medium' | 'low' }[] = [];
-  const overdueRentals = s.rentals.filter(r => r.status === 'overdue');
-  for (const r of overdueRentals) {
-    const cust = s.customers.find(c => c.id === r.customerId);
-    alerts.push({ id: r.id, type: 'rental', title: 'تأخیر در عودت خودروی اجاره‌ای', description: `قرارداد ${r.code} — مهلت عودت به مشتری ${cust ? cust.firstName + ' ' + cust.lastName : '—'} گذشته است`, severity: 'high' });
-  }
-  const lateInstallments = s.installments.filter(i => i.status === 'active')
-    .flatMap(i => i.schedule.filter(r => r.status === 'late').map(r => ({ i, r })));
-  for (const { i, r } of lateInstallments) {
-    const cust = s.customers.find(c => c.id === i.customerId);
-    alerts.push({ id: i.code + r.no, type: 'installment', title: 'قسط معوق', description: `قرارداد ${i.code} — قسط شماره ${r.no} به مبلغ ${Math.round(r.amount / 1e6)} میلیون — مشتری: ${cust ? cust.firstName + ' ' + cust.lastName : '—'}`, severity: 'high' });
-  }
-  for (const p of lowStock) {
-    alerts.push({ id: p.id, type: 'stock', title: 'موجودی قطعه کم است', description: `${p.name} (${p.code}) — موجودی ${p.quantity} از حداقل ${p.minQuantity}`, severity: 'medium' });
-  }
-  const pendingApprovals = s.purchaseRequests.filter(p => p.status === 'pending_approval');
-  for (const p of pendingApprovals) {
-    alerts.push({ id: p.id, type: 'purchase', title: 'درخواست خرید در انتظار تأیید', description: `${p.code} — ${p.items.map(i => i.name).join('، ')}`, severity: 'medium' });
-  }
-  const dueFollowUps = s.customers.flatMap(c => c.followUps.filter(f => !f.done && new Date(f.dueDate) <= new Date(Date.now() + 2 * 86400000)).map(f => ({ c, f })));
-  for (const { c, f } of dueFollowUps) {
-    alerts.push({ id: f.id, type: 'crm', title: 'پیگیری مشتری', description: `${c.firstName} ${c.lastName} — ${f.title}`, severity: 'low' });
-  }
+  // هشدارها از موتور مشترک اعلان‌ها (شامل بیمه، معاینه فنی، سررسید اقساط، عودت اجاره و ...)
+  const alerts = computeAlerts(s);
 
   const openWorkOrders = s.workOrders.filter(w => w.status !== 'delivered').length;
   const workshopByStatus = s.workOrders.reduce<Record<string, number>>((acc, w) => {

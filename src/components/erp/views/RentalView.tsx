@@ -2,7 +2,7 @@
 
 // ─── اجاره خودرو ───
 import { useMemo, useState } from 'react';
-import { Plus, KeyRound, CalendarClock, AlertOctagon, Coins, ArrowLeft } from 'lucide-react';
+import { Plus, KeyRound, CalendarClock, AlertOctagon, Coins, ArrowLeft, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { KpiCard, PageHeader, StatusPill, FormDialog, LoadingTable, EmptyRow } from '../shared';
 import { useEntity } from '../use-erp';
+import JalaliDatePicker from '../jalali-date-picker';
+import { PrintDocDialog, RentalContractDoc } from '../print/print-docs';
 import type { Rental, Vehicle, Customer } from '@/lib/erp-types';
 import { money, moneyShort, faNumber, jdate, rentalStatusLabels, fuelLabels, uid } from '@/lib/erp-utils';
 
@@ -28,7 +30,9 @@ export default function RentalView() {
   const { items: customers } = useEntity<Customer>('customers');
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [printId, setPrintId] = useState<string | null>(null);
   const [form, setForm] = useState({ vehicleId: '', customerId: '', startDate: '', endDate: '', dailyRate: '', deposit: '' });
+  const printRental = rentals.find(r => r.id === printId) || null;
 
   const fleet = vehicles.filter(v => v.category === 'rental_fleet');
   const cName = (id: string) => { const c = customers.find(x => x.id === id); return c ? `${c.firstName} ${c.lastName}` : '—'; };
@@ -144,11 +148,12 @@ export default function RentalView() {
               <TableHead className="hidden sm:table-cell">پرداخت</TableHead>
               <TableHead>وضعیت</TableHead>
               <TableHead className="text-center">عملیات</TableHead>
+              <TableHead className="w-10" aria-label="چاپ" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading && <TableRow><TableCell colSpan={8}><LoadingTable /></TableCell></TableRow>}
-            {!loading && rentals.length === 0 && <EmptyRow colSpan={8} text="قرارداد اجاره‌ای ثبت نشده" />}
+            {loading && <TableRow><TableCell colSpan={9}><LoadingTable /></TableCell></TableRow>}
+            {!loading && rentals.length === 0 && <EmptyRow colSpan={9} text="قرارداد اجاره‌ای ثبت نشده" />}
             {!loading && rentals.map(r => (
               <TableRow key={r.id}>
                 <TableCell className="font-mono text-xs" dir="ltr">{r.code}</TableCell>
@@ -164,6 +169,11 @@ export default function RentalView() {
                     {['active', 'overdue'].includes(r.status) && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => returnCar(r)}>عودت</Button>}
                     {r.status === 'active' && <Button size="sm" variant="ghost" className="h-7 text-xs text-red-600" onClick={() => markOverdue(r)}>ثبت تأخیر</Button>}
                   </div>
+                </TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-teal-700" title="چاپ قرارداد اجاره" onClick={() => setPrintId(r.id)}>
+                    <Printer className="h-3.5 w-3.5" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -193,11 +203,11 @@ export default function RentalView() {
           </div>
           <div className="space-y-1.5">
             <Label>تاریخ شروع *</Label>
-            <Input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
+            <JalaliDatePicker value={form.startDate} onChange={iso => setForm({ ...form, startDate: iso })} placeholder="انتخاب تاریخ شروع" />
           </div>
           <div className="space-y-1.5">
             <Label>تاریخ پایان *</Label>
-            <Input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} />
+            <JalaliDatePicker value={form.endDate} onChange={iso => setForm({ ...form, endDate: iso })} placeholder="انتخاب تاریخ پایان" />
           </div>
           <div className="space-y-1.5"><Label>نرخ روزانه (تومان) *</Label><Input dir="ltr" value={form.dailyRate} onChange={e => setForm({ ...form, dailyRate: e.target.value })} placeholder="4500000" /></div>
           <div className="space-y-1.5"><Label>ودیعه (تومان)</Label><Input dir="ltr" value={form.deposit} onChange={e => setForm({ ...form, deposit: e.target.value })} placeholder="100000000" /></div>
@@ -207,6 +217,17 @@ export default function RentalView() {
           <Button onClick={handleAdd} className="gap-1">ثبت رزرو <ArrowLeft className="h-3.5 w-3.5" /></Button>
         </div>
       </FormDialog>
+
+      {/* چاپ قرارداد اجاره */}
+      <PrintDocDialog open={!!printRental} onOpenChange={v => !v && setPrintId(null)} title={`قرارداد اجاره ${printRental?.code || ''}`}>
+        {printRental && (
+          <RentalContractDoc
+            rental={printRental}
+            vehicle={vehicles.find(v => v.id === printRental.vehicleId)}
+            customer={customers.find(c => c.id === printRental.customerId)}
+          />
+        )}
+      </PrintDocDialog>
     </div>
   );
 }

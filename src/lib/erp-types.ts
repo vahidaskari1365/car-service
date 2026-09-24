@@ -37,6 +37,8 @@ export interface Vehicle {
   customerName?: string; // خریدار فعلی / مالک
   preparationStatus: 'none' | 'in_progress' | 'done';
   costs: VehicleCost[];
+  insuranceExpiry?: string;   // تاریخ انقضای بیمه‌نامه (ISO)
+  inspectionExpiry?: string;  // تاریخ انقضای معاینه فنی (ISO)
   notes?: string;
   createdAt: string;
 }
@@ -311,5 +313,4 @@ export interface ERPData {
   transactions: Transaction[];
   activityLogs: ActivityLog[];
   employees: Employee[];
-  aiSettings: AIProviderSettings;
 }
