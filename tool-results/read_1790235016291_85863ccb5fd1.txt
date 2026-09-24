@@ -1,0 +1,956 @@
+     1→'use client';
+     2→
+     3→// ─── اتوماسیون فرآیندها: طراح گرافیکی زنده (n8n-مانند) + فرآیندهای جاری ───
+     4→import { useEffect, useRef, useState } from 'react';
+     5→import {
+     6→  GitBranch, ArrowLeft, CircleX, History, Zap, Wrench, Split, UserCheck,
+     7→  BellRing, Timer, Flag, Play, Save, Trash2, FilePlus2, Sparkles, Loader2,
+     8→  CheckCircle2, XCircle, SkipForward, TriangleAlert, MousePointerClick, Link2,
+     9→  Activity, type LucideIcon,
+    10→} from 'lucide-react';
+    11→import { Button } from '@/components/ui/button';
+    12→import { Input } from '@/components/ui/input';
+    13→import { Label } from '@/components/ui/label';
+    14→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+    15→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    16→import { useToast } from '@/hooks/use-toast';
+    17→import { PageHeader, StatusPill, FormDialog, LoadingTable, DetailDrawer, KpiCard } from '../shared';
+    18→import { useEntity } from '../use-erp';
+    19→import { getActorName } from '@/lib/actor';
+    20→import { KIND_DEFS, configSummary } from '@/lib/flow-defs';
+    21→import { uid, faNumber, jdate, jdatetime } from '@/lib/erp-utils';
+    22→import type { FlowDef, FlowEdge, FlowNode, FlowNodeKind, FlowNodeState, WorkflowProcess } from '@/lib/erp-types';
+    23→
+    24→// ─── ثابت‌های بوم ───
+    25→const NODE_W = 180;
+    26→const NODE_H = 64;
+    27→const CANVAS_W = 2000;
+    28→const CANVAS_H = 1300;
+    29→
+    30→const KIND_ICON: Record<FlowNodeKind, LucideIcon> = {
+    31→  trigger: Zap, task: Wrench, condition: Split, approval: UserCheck,
+    32→  notify: BellRing, delay: Timer, end: Flag,
+    33→};
+    34→
+    35→interface RunResult { nodeId: string; status: 'success' | 'error'; message: string; durationMs: number }
+    36→interface RunResponse {
+    37→  path: string[];
+    38→  results: RunResult[];
+    39→  skipped: { nodeId: string; reason: string }[];
+    40→  warnings: string[];
+    41→  summary: { total: number; ok: number; failed: number; durationMs: number };
+    42→  error?: string;
+    43→}
+    44→interface LogEntry { nodeId: string | null; label: string; status: 'success' | 'error' | 'skipped' | 'warning'; message: string; durationMs: number }
+    45→
+    46→const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    47→
+    48→/** قالب نمونه با شناسه‌های تازه */
+    49→function sampleTemplate(): { nodes: FlowNode[]; edges: FlowEdge[] } {
+    50→  const ids = Array.from({ length: 9 }, () => uid('n'));
+    51→  const [a, b, c, d, e, f, g, h, i] = ids;
+    52→  return {
+    53→    nodes: [
+    54→      { id: a, kind: 'trigger', label: 'درخواست مشتری', config: { event: 'customer_request' }, x: 30, y: 150 },
+    55→      { id: b, kind: 'task', label: 'بررسی موجودی نمایشگاه', config: { action: 'check_inventory', responsible: 'کارشناس فروش' }, x: 265, y: 150 },
+    56→      { id: c, kind: 'condition', label: 'خودرو آماده فروش هست؟', config: { cond: 'has_stock' }, x: 500, y: 150 },
+    57→      { id: d, kind: 'task', label: 'بررسی مدارک مشتری', config: { action: 'check_customer', responsible: 'کارشناس فروش' }, x: 735, y: 55 },
+    58→      { id: e, kind: 'approval', label: 'تأیید مدیر فروش', config: { approver: 'مدیر فروشگاه' }, x: 970, y: 55 },
+    59→      { id: f, kind: 'notify', label: 'اطلاع به مشتری', config: { channel: 'sms', recipient: '09121234567' }, x: 1205, y: 55 },
+    60→      { id: g, kind: 'task', label: 'ثبت قرارداد فروش', config: { action: 'register_docs', responsible: 'واحد قراردادها' }, x: 1440, y: 55 },
+    61→      { id: h, kind: 'end', label: 'تحویل و پایان', config: {}, x: 1675, y: 55 },
+    62→      { id: i, kind: 'notify', label: 'به مشتری اطلاع بده موجودی نیست', config: { channel: 'app', recipient: 'کارشناس فروش' }, x: 735, y: 265 },
+    63→    ],
+    64→    edges: [
+    65→      { id: uid('e'), from: a, to: b },
+    66→      { id: uid('e'), from: b, to: c },
+    67→      { id: uid('e'), from: c, to: d, label: 'بله' },
+    68→      { id: uid('e'), from: d, to: e },
+    69→      { id: uid('e'), from: e, to: f },
+    70→      { id: uid('e'), from: f, to: g },
+    71→      { id: uid('e'), from: g, to: h },
+    72→      { id: uid('e'), from: c, to: i, label: 'خیر' },
+    73→    ],
+    74→  };
+    75→}
+    76→
+    77→// ═══════════════════ طراح گرافیکی فرآیند ═══════════════════
+    78→function FlowDesigner() {
+    79→  const { items: flows, refresh: refreshFlows } = useEntity<FlowDef>('flows');
+    80→  const { toast } = useToast();
+    81→  // یک نمونه واحد تا شناسه‌های نود و یال قالب هم‌خوان بمانند
+    82→  const [initialTemplate] = useState(() => sampleTemplate());
+    83→
+    84→  const [flowId, setFlowId] = useState<string | null>(null);
+    85→  const [flowName, setFlowName] = useState('فرآیند فروش خودرو (نمونه)');
+    86→  const [nodes, setNodes] = useState<FlowNode[]>(initialTemplate.nodes);
+    87→  const [edges, setEdges] = useState<FlowEdge[]>(initialTemplate.edges);
+    88→  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+    89→  const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
+    90→  const [connecting, setConnecting] = useState<string | null>(null);
+    91→  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
+    92→  const [dirty, setDirty] = useState(false);
+    93→  const [saving, setSaving] = useState(false);
+    94→
+    95→  // وضعیت اجرای تست
+    96→  const [running, setRunning] = useState(false);
+    97→  const [states, setStates] = useState<Record<string, FlowNodeState>>({});
+    98→  const [msgs, setMsgs] = useState<Record<string, string>>({});
+    99→  const [activeEdge, setActiveEdge] = useState<string | null>(null);
+   100→  const [log, setLog] = useState<LogEntry[]>([]);
+   101→  const [summary, setSummary] = useState<RunResponse['summary'] | null>(null);
+   102→
+   103→  const connectingRef = useRef<string | null>(null);
+   104→  const runningRef = useRef(false);
+   105→  const scrollRef = useRef<HTMLDivElement>(null);
+   106→  const logRef = useRef<HTMLDivElement>(null);
+   107→
+   108→  useEffect(() => {
+   109→    connectingRef.current = connecting;
+   110→  }, [connecting]);
+   111→  useEffect(() => {
+   112→    runningRef.current = running;
+   113→  }, [running]);
+   114→  useEffect(() => {
+   115→    logRef.current?.scrollTo({ top: 1e9, behavior: 'smooth' });
+   116→  }, [log.length]);
+   117→
+   118→  const labelOf = (id: string | null) => (id ? nodes.find(n => n.id === id)?.label || 'نود' : '—');
+   119→  const nodeById = (id: string) => nodes.find(n => n.id === id);
+   120→  const hasTrigger = nodes.some(n => n.kind === 'trigger');
+   121→
+   122→  function touch() { setDirty(true); }
+   123→
+   124→  // ─── افزودن نود ───
+   125→  function addNode(kind: FlowNodeKind) {
+   126→    if (runningRef.current) return;
+   127→    const n = nodes.length;
+   128→    const node: FlowNode = {
+   129→      id: uid('n'), kind,
+   130→      label: KIND_DEFS[kind].fa,
+   131→      config: kind === 'trigger' ? { event: 'customer_request' } : kind === 'condition' ? { cond: 'has_stock' } : {},
+   132→      x: 30 + (n % 5) * 245, y: 60 + Math.floor(n / 5) * 140,
+   133→    };
+   134→    setNodes(ns => [...ns, node]);
+   135→    setSelectedNode(node.id);
+   136→    setSelectedEdge(null);
+   137→    touch();
+   138→  }
+   139→
+   140→  // ─── حذف نود / یال ───
+   141→  function deleteNode(id: string) {
+   142→    if (runningRef.current) return;
+   143→    setNodes(ns => ns.filter(n => n.id !== id));
+   144→    setEdges(es => es.filter(e => e.from !== id && e.to !== id));
+   145→    setSelectedNode(null);
+   146→    touch();
+   147→  }
+   148→  function deleteEdge(id: string) {
+   149→    if (runningRef.current) return;
+   150→    setEdges(es => es.filter(e => e.id !== id));
+   151→    setSelectedEdge(null);
+   152→    touch();
+   153→  }
+   154→
+   155→  // ─── اتصال نودها ───
+   156→  function startConnect(id: string, ev: React.PointerEvent) {
+   157→    ev.stopPropagation();
+   158→    if (runningRef.current) return;
+   159→    setConnecting(id);
+   160→    setSelectedNode(null);
+   161→    setSelectedEdge(null);
+   162→  }
+   163→  function completeConnect(targetId: string) {
+   164→    const from = connectingRef.current;
+   165→    setConnecting(null);
+   166→    setGhost(null);
+   167→    if (!from || from === targetId || runningRef.current) return;
+   168→    setEdges(es => {
+   169→      if (es.some(e => e.from === from && e.to === targetId)) return es;
+   170→      const fromNode = nodeById(from);
+   171→      let label: string | undefined;
+   172→      if (fromNode?.kind === 'condition') {
+   173→        const outs = es.filter(e => e.from === from);
+   174→        if (!outs.some(x => x.label === 'بله')) label = 'بله';
+   175→        else if (!outs.some(x => x.label === 'خیر')) label = 'خیر';
+   176→      }
+   177→      return [...es, { id: uid('e'), from, to: targetId, label }];
+   178→    });
+   179→    touch();
+   180→  }
+   181→  function cancelConnect() { setConnecting(null); setGhost(null); }
+   182→
+   183→  // ─── درگ نود ───
+   184→  function onNodePointerDown(node: FlowNode, ev: React.PointerEvent) {
+   185→    if (runningRef.current) return;
+   186→    ev.stopPropagation();
+   187→    const startX = ev.clientX, startY = ev.clientY;
+   188→    const origX = node.x, origY = node.y;
+   189→    let moved = false;
+   190→    const onMove = (e2: PointerEvent) => {
+   191→      const dx = e2.clientX - startX, dy = e2.clientY - startY;
+   192→      if (!moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+   193→      moved = true;
+   194→      setNodes(ns => ns.map(n => n.id === node.id
+   195→        ? { ...n, x: Math.max(4, Math.min(CANVAS_W - NODE_W - 4, origX + dx)), y: Math.max(4, Math.min(CANVAS_H - NODE_H - 4, origY + dy)) }
+   196→        : n));
+   197→    };
+   198→    const onUp = () => {
+   199→      window.removeEventListener('pointermove', onMove);
+   200→      window.removeEventListener('pointerup', onUp);
+   201→      if (moved) { touch(); return; }
+   202→      if (connectingRef.current) { completeConnect(node.id); return; }
+   203→      setSelectedNode(node.id);
+   204→      setSelectedEdge(null);
+   205→    };
+   206→    window.addEventListener('pointermove', onMove);
+   207→    window.addEventListener('pointerup', onUp);
+   208→  }
+   209→
+   210→  function onCanvasPointerMove(ev: React.PointerEvent) {
+   211→    if (!connectingRef.current) return;
+   212→    const el = scrollRef.current;
+   213→    if (!el) return;
+   214→    const rect = el.getBoundingClientRect();
+   215→    setGhost({ x: ev.clientX - rect.left + el.scrollLeft, y: ev.clientY - rect.top + el.scrollTop });
+   216→  }
+   217→  function onCanvasBgClick(ev: React.MouseEvent) {
+   218→    const t = ev.target as HTMLElement;
+   219→    // کلیک روی خودِ نود/پیام‌های نود/برچسب یال نباید انتخاب را پاک کند
+   220→    if (t.closest('.wf-node') || t.closest('.wf-node-msg') || t.closest('button')) return;
+   221→    cancelConnect();
+   222→    setSelectedNode(null);
+   223→    setSelectedEdge(null);
+   224→  }
+   225→
+   226→  // ─── ذخیره / بارگذاری ───
+   227→  async function saveFlow() {
+   228→    if (!flowName.trim()) { toast({ title: 'نام فرآیند را وارد کنید', variant: 'destructive' }); return; }
+   229→    setSaving(true);
+   230→    try {
+   231→      const headers = { 'Content-Type': 'application/json', 'X-User': encodeURIComponent(getActorName()) };
+   232→      if (flowId) {
+   233→        const res = await fetch('/api/flows', { method: 'PUT', headers, body: JSON.stringify({ id: flowId, name: flowName, nodes, edges }) });
+   234→        if (!res.ok) throw new Error();
+   235→      } else {
+   236→        const res = await fetch('/api/flows', { method: 'POST', headers, body: JSON.stringify({ name: flowName, nodes, edges }) });
+   237→        const json = await res.json();
+   238→        if (!res.ok) throw new Error();
+   239→        if (json.data?.id) setFlowId(json.data.id);
+   240→      }
+   241→      await refreshFlows();
+   242→      setDirty(false);
+   243→      toast({ title: 'فرآیند ذخیره شد ✓', description: flowName });
+   244→    } catch {
+   245→      toast({ title: 'خطا در ذخیره فرآیند', variant: 'destructive' });
+   246→    } finally { setSaving(false); }
+   247→  }
+   248→
+   249→  function loadFlow(id: string) {
+   250→    const f = flows.find(x => x.id === id);
+   251→    if (!f) return;
+   252→    setFlowId(f.id);
+   253→    setFlowName(f.name);
+   254→    setNodes(JSON.parse(JSON.stringify(f.nodes)));
+   255→    setEdges(JSON.parse(JSON.stringify(f.edges)));
+   256→    setSelectedNode(null); setSelectedEdge(null);
+   257→    setStates({}); setMsgs({}); setLog([]); setSummary(null);
+   258→    setDirty(false);
+   259→  }
+   260→
+   261→  function newFlow() {
+   262→    setFlowId(null); setFlowName(''); setNodes([]); setEdges([]);
+   263→    setSelectedNode(null); setSelectedEdge(null);
+   264→    setStates({}); setMsgs({}); setLog([]); setSummary(null);
+   265→    setDirty(false);
+   266→  }
+   267→  function loadSample() {
+   268→    const t = sampleTemplate();
+   269→    setNodes(t.nodes); setEdges(t.edges);
+   270→    setFlowName('فرآیند نمونه فروش');
+   271→    setStates({}); setMsgs({}); setLog([]); setSummary(null);
+   272→    setDirty(true);
+   273→  }
+   274→  async function removeFlow() {
+   275→    if (!flowId) return;
+   276→    await fetch(`/api/flows?id=${flowId}`, { method: 'DELETE', headers: { 'X-User': encodeURIComponent(getActorName()) } });
+   277→    await refreshFlows();
+   278→    newFlow();
+   279→    toast({ title: 'فرآیند حذف شد' });
+   280→  }
+   281→
+   282→  // ─── اجرای تست فرایند (قلب سیستم — مانند n8n) ───
+   283→  async function runTest() {
+   284→    if (runningRef.current || nodes.length === 0) return;
+   285→    setRunning(true);
+   286→    setStates(Object.fromEntries(nodes.map(n => [n.id, 'idle' as FlowNodeState])));
+   287→    setMsgs({}); setLog([]); setSummary(null); setActiveEdge(null);
+   288→    try {
+   289→      const res = await fetch('/api/workflow/run', {
+   290→        method: 'POST',
+   291→        headers: { 'Content-Type': 'application/json', 'X-User': encodeURIComponent(getActorName()) },
+   292→        body: JSON.stringify({ flow: { id: flowId || 'tmp', name: flowName || 'فرآیند بدون نام', nodes, edges } }),
+   293→      });
+   294→      const json = await res.json() as RunResponse;
+   295→      if (!res.ok || json.error) {
+   296→        toast({ title: json.error || 'خطا در اجرای تست فرآیند', variant: 'destructive' });
+   297→        return;
+   298→      }
+   299→      for (const r of json.results) {
+   300→        setActiveEdge(edges.find(e => e.to === r.nodeId)?.id || null);
+   301→        setStates(st => ({ ...st, [r.nodeId]: 'running' }));
+   302→        await sleep(640);
+   303→        setStates(st => ({ ...st, [r.nodeId]: r.status }));
+   304→        setMsgs(m => ({ ...m, [r.nodeId]: r.message }));
+   305→        setLog(l => [...l, { nodeId: r.nodeId, label: labelOf(r.nodeId), status: r.status, message: r.message, durationMs: r.durationMs }]);
+   306→        await sleep(r.status === 'error' ? 460 : 200);
+   307→        setActiveEdge(null);
+   308→      }
+   309→      for (const s of json.skipped) {
+   310→        setStates(st => ({ ...st, [s.nodeId]: 'skipped' }));
+   311→        setMsgs(m => ({ ...m, [s.nodeId]: s.reason }));
+   312→        setLog(l => [...l, { nodeId: s.nodeId, label: labelOf(s.nodeId), status: 'skipped', message: s.reason, durationMs: 0 }]);
+   313→      }
+   314→      for (const w of json.warnings) {
+   315→        setLog(l => [...l, { nodeId: null, label: 'هشدار ساختار', status: 'warning', message: w, durationMs: 0 }]);
+   316→      }
+   317→      setSummary(json.summary);
+   318→      const allOk = json.summary.failed === 0;
+   319→      if (flowId) {
+   320→        fetch('/api/flows', {
+   321→          method: 'PUT',
+   322→          headers: { 'Content-Type': 'application/json', 'X-User': encodeURIComponent(getActorName()) },
+   323→          body: JSON.stringify({ id: flowId, lastTestAt: new Date().toISOString(), lastTestOk: allOk }),
+   324→        }).catch(() => {});
+   325→      }
+   326→      const failMsg = json.results.find(r => r.status === 'error')?.message;
+   327→      if (allOk) {
+   328→        toast({ title: `تست موفق — ${faNumber(json.summary.ok)} مرحله سبز شد ✓`, description: `${flowName} · ${faNumber(json.summary.durationMs)}ms` });
+   329→      } else {
+   330→        toast({ title: 'تست با خطا متوقف شد', description: failMsg, variant: 'destructive' });
+   331→      }
+   332→    } catch {
+   333→      toast({ title: 'ارتباط با سرور برقرار نشد', variant: 'destructive' });
+   334→    } finally {
+   335→      setRunning(false);
+   336→      setActiveEdge(null);
+   337→    }
+   338→  }
+   339→
+   340→  // ─── محاسبه مسیر بِزیه ───
+   341→  function edgeGeom(e: FlowEdge) {
+   342→    const from = nodeById(e.from), to = nodeById(e.to);
+   343→    if (!from || !to) return null;
+   344→    const x1 = from.x + NODE_W, y1 = from.y + NODE_H / 2;
+   345→    const x2 = to.x, y2 = to.y + NODE_H / 2;
+   346→    const dx = Math.max(46, Math.abs(x2 - x1) / 2);
+   347→    return { x1, y1, x2, y2, d: `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 };
+   348→  }
+   349→
+   350→  function edgeClass(e: FlowEdge): string {
+   351→    const targetState = states[e.to];
+   352→    if (activeEdge === e.id) return 'stroke-amber-500 wf-edge-active';
+   353→    if (targetState === 'success') return 'stroke-emerald-500';
+   354→    if (targetState === 'error') return 'stroke-red-500';
+   355→    if (targetState === 'skipped') return 'stroke-zinc-300 dark:stroke-zinc-700';
+   356→    return 'stroke-zinc-400 dark:stroke-zinc-600';
+   357→  }
+   358→  function edgeMarker(e: FlowEdge): string {
+   359→    const targetState = states[e.to];
+   360→    if (activeEdge === e.id) return 'url(#wf-arrow-active)';
+   361→    if (targetState === 'success') return 'url(#wf-arrow-success)';
+   362→    if (targetState === 'error') return 'url(#wf-arrow-error)';
+   363→    return 'url(#wf-arrow)';
+   364→  }
+   365→
+   366→  const selNode = selectedNode ? nodeById(selectedNode) : null;
+   367→  const selEdge = selectedEdge ? edges.find(e => e.id === selectedEdge) : null;
+   368→
+   369→  return (
+   370→    <div className="space-y-3">
+   371→      {/* ─── نوار ابزار ─── */}
+   372→      <div className="rounded-xl border bg-card shadow-sm p-2.5 flex flex-wrap items-center gap-2">
+   373→        <Select value={flowId || undefined} onValueChange={loadFlow}>
+   374→          <SelectTrigger className="w-56 h-8 text-xs"><SelectValue placeholder="بارگذاری فرآیند ذخیره‌شده…" /></SelectTrigger>
+   375→          <SelectContent>
+   376→            {flows.map(f => (
+   377→              <SelectItem key={f.id} value={f.id}>
+   378→                {f.name}{f.lastTestOk === true ? ' ✓' : f.lastTestOk === false ? ' ✗' : ''}
+   379→              </SelectItem>
+   380→            ))}
+   381→          </SelectContent>
+   382→        </Select>
+   383→        <Button size="sm" variant="ghost" className="h-8 gap-1 text-xs" onClick={newFlow}><FilePlus2 className="h-3.5 w-3.5" /> فرآیند جدید</Button>
+   384→        <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={loadSample}><Sparkles className="h-3.5 w-3.5" /> قالب نمونه</Button>
+   385→        <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={saveFlow} disabled={saving}>
+   386→          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} ذخیره
+   387→        </Button>
+   388→        {flowId && (
+   389→          <Button size="sm" variant="ghost" className="h-8 gap-1 text-xs text-red-600 hover:text-red-700" onClick={removeFlow}><Trash2 className="h-3.5 w-3.5" /> حذف</Button>
+   390→        )}
+   391→        <Input value={flowName} onChange={e => { setFlowName(e.target.value); touch(); }} placeholder="نام فرآیند…" className="w-52 h-8 text-xs" />
+   392→        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+   393→          <span className="rounded-md bg-muted px-1.5 py-0.5">{faNumber(nodes.length)} نود</span>
+   394→          <span className="rounded-md bg-muted px-1.5 py-0.5">{faNumber(edges.length)} اتصال</span>
+   395→          {dirty && <span className="rounded-md bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300 px-1.5 py-0.5">ذخیره نشده</span>}
+   396→          {!hasTrigger && <span className="rounded-md bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300 px-1.5 py-0.5">نود شروع لازم است</span>}
+   397→        </div>
+   398→        {/* دکمه پایانی: تست فرایند */}
+   399→        <Button className="h-9 gap-1.5 ms-auto font-bold shadow-md" onClick={runTest} disabled={running || nodes.length === 0}>
+   400→          {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+   401→          {running ? 'در حال اجرای تست…' : 'تست فرایند'}
+   402→        </Button>
+   403→      </div>
+   404→
+   405→      {/* خلاصه نتیجه تست */}
+   406→      {summary && (
+   407→        <div className="flex flex-wrap items-center gap-2 text-xs wf-log-enter">
+   408→          <span className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 px-2.5 py-1 font-bold">
+   409→            ✓ {faNumber(summary.ok)} مرحله موفق
+   410→          </span>
+   411→          <span className={`rounded-lg border px-2.5 py-1 font-bold ${summary.failed ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300' : 'border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-500/30 dark:bg-zinc-500/10 dark:text-zinc-400'}`}>
+   412→            {summary.failed ? `✗ ${faNumber(summary.failed)} خطا` : 'بدون خطا'}
+   413→          </span>
+   414→          <span className="rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-500/30 dark:bg-zinc-500/10 dark:text-zinc-400 px-2.5 py-1">
+   415→            {faNumber(summary.total - summary.ok - summary.failed)} گره اجرا نشده
+   416→          </span>
+   417→          <span className="text-muted-foreground">زمان کل: {faNumber(summary.durationMs)} میلی‌ثانیه</span>
+   418→        </div>
+   419→      )}
+   420→
+   421→      <div className="flex flex-col lg:flex-row gap-3 items-stretch">
+   422→        {/* ─── پالت انواع نود ─── */}
+   423→        <div className="rounded-xl border bg-card shadow-sm p-2 w-full lg:w-44 shrink-0 space-y-1">
+   424→          <div className="text-[11px] font-bold text-muted-foreground px-1 pb-1 border-b mb-1.5">افزودن گره</div>
+   425→          {(Object.keys(KIND_DEFS) as FlowNodeKind[]).map(kind => {
+   426→            const Icon = KIND_ICON[kind];
+   427→            return (
+   428→              <button
+   429→                key={kind}
+   430→                onClick={() => addNode(kind)}
+   431→                disabled={running}
+   432→                className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-right hover:bg-muted transition-colors disabled:opacity-50 group"
+   433→              >
+   434→                <span className={`h-7 w-7 rounded-lg grid place-items-center shrink-0 ${KIND_DEFS[kind].tone}`}><Icon className="h-3.5 w-3.5" /></span>
+   435→                <span className="min-w-0">
+   436→                  <span className="block text-[11px] font-bold leading-4">{KIND_DEFS[kind].fa}</span>
+   437→                  <span className="block text-[10px] text-muted-foreground leading-3.5 truncate">{KIND_DEFS[kind].desc}</span>
+   438→                </span>
+   439→              </button>
+   440→            );
+   441→          })}
+   442→          <div className="text-[10px] text-muted-foreground leading-4 pt-2 border-t mt-1.5 flex items-start gap-1">
+   443→            <MousePointerClick className="h-3 w-3 mt-0.5 shrink-0" />
+   444→            برای اتصال: روی دایرهٔ خروجی نود کلیک کنید، سپس نود مقصد را بزنید.
+   445→          </div>
+   446→        </div>
+   447→
+   448→        {/* ─── بوم ─── */}
+   449→        <div className="flex-1 min-w-0 space-y-2">
+   450→          <div
+   451→            ref={scrollRef}
+   452→            dir="ltr"
+   453→            className="relative overflow-auto wf-canvas-bg rounded-xl border shadow-inner h-[520px]"
+   454→            onPointerMove={onCanvasPointerMove}
+   455→            onClick={onCanvasBgClick}
+   456→          >
+   457→            <div className="relative" style={{ width: CANVAS_W, height: CANVAS_H }}>
+   458→              <svg width={CANVAS_W} height={CANVAS_H} className="absolute inset-0" style={{ pointerEvents: 'none' }}>
+   459→                <defs>
+   460→                  <marker id="wf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className="fill-zinc-400 dark:fill-zinc-600" /></marker>
+   461→                  <marker id="wf-arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className="fill-amber-500" /></marker>
+   462→                  <marker id="wf-arrow-success" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className="fill-emerald-500" /></marker>
+   463→                  <marker id="wf-arrow-error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className="fill-red-500" /></marker>
+   464→                </defs>
+   465→                {/* خط اتصال شبح هنگام وصل کردن */}
+   466→                {connecting && ghost && (() => {
+   467→                  const from = nodeById(connecting);
+   468→                  if (!from) return null;
+   469→                  const x1 = from.x + NODE_W, y1 = from.y + NODE_H / 2;
+   470→                  return <line x1={x1} y1={y1} x2={ghost.x} y2={ghost.y} stroke="oklch(0.77 0.16 70)" strokeWidth={2} strokeDasharray="6 4" />;
+   471→                })()}
+   472→                {edges.map(e => {
+   473→                  const g = edgeGeom(e);
+   474→                  if (!g) return null;
+   475→                  return (
+   476→                    <g key={e.id}>
+   477→                      <path d={g.d} fill="none" strokeWidth={16} stroke="transparent" style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+   478→                        onPointerDown={ev => { ev.stopPropagation(); if (!runningRef.current) { setSelectedEdge(e.id); setSelectedNode(null); cancelConnect(); } }} />
+   479→                      <path d={g.d} fill="none" strokeWidth={activeEdge === e.id ? 2.5 : 2} className={`${edgeClass(e)} wf-node`} markerEnd={edgeMarker(e)} />
+   480→                    </g>
+   481→                  );
+   482→                })}
+   483→              </svg>
+   484→
+   485→              {/* برچسب یال‌ها (بله/خیر) */}
+   486→              {edges.filter(e => e.label).map(e => {
+   487→                const g = edgeGeom(e);
+   488→                if (!g) return null;
+   489→                return (
+   490→                  <button
+   491→                    key={e.id}
+   492→                    dir="rtl"
+   493→                    onClick={ev => { ev.stopPropagation(); if (!runningRef.current) { setSelectedEdge(e.id); setSelectedNode(null); } }}
+   494→                    className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold rounded-full px-2 py-0.5 border shadow-sm transition-transform hover:scale-110 ${e.label === 'بله'
+   495→                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30'
+   496→                      : 'bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-500/15 dark:text-zinc-300 dark:border-zinc-500/30'}`}
+   497→                    style={{ left: g.mx, top: g.my }}
+   498→                  >
+   499→                    {e.label}
+   500→                  </button>
+   501→                );
+   502→              })}
+   503→
+   504→              {/* نودها */}
+   505→              {nodes.map(n => {
+   506→                const Icon = KIND_ICON[n.kind];
+   507→                const st = states[n.id] || 'idle';
+   508→                const msg = msgs[n.id];
+   509→                const isSel = selectedNode === n.id;
+   510→                const box = [
+   511→                  'wf-node absolute rounded-xl border-2 bg-card shadow-md cursor-grab active:cursor-grabbing',
+   512→                  st === 'running' && 'border-amber-400 ring-2 ring-amber-300/70 wf-running',
+   513→                  st === 'success' && 'border-emerald-500 ring-2 ring-emerald-400/60 wf-pop',
+   514→                  st === 'error' && 'border-red-500 ring-2 ring-red-400/60 wf-shake',
+   515→                  st === 'skipped' && 'border-dashed border-zinc-300 dark:border-zinc-700 opacity-50',
+   516→                  st === 'idle' && !isSel && 'border-border hover:border-primary/50',
+   517→                  isSel && st === 'idle' && 'border-primary ring-2 ring-primary/30',
+   518→                ].filter(Boolean).join(' ');
+   519→                return (
+   520→                  <div key={n.id} className="absolute" style={{ left: n.x, top: n.y, width: NODE_W }}>
+   521→                    <div
+   522→                      className={box}
+   523→                      style={{ width: NODE_W, minHeight: NODE_H }}
+   524→                      onPointerDown={ev => onNodePointerDown(n, ev)}
+   525→                    >
+   526→                      {/* پورت ورودی و خروجی */}
+   527→                      <span className="absolute -left-[7px] top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-zinc-300 dark:bg-zinc-600 border-2 border-background" />
+   528→                      <span
+   529→                        className="wf-port absolute -right-[7px] top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full bg-amber-400 border-2 border-background shadow hover:scale-150 transition-transform"
+   530→                        title="اتصال به نود بعدی"
+   531→                        onPointerDown={ev => startConnect(n.id, ev)}
+   532→                      />
+   533→                      <div className="flex items-start gap-2 p-2" dir="rtl">
+   534→                        <span className={`h-8 w-8 rounded-lg grid place-items-center shrink-0 ${KIND_DEFS[n.kind].tone}`}>
+   535→                          {st === 'running' ? <Loader2 className="h-4 w-4 animate-spin text-amber-600" /> : <Icon className="h-4 w-4" />}
+   536→                        </span>
+   537→                        <span className="min-w-0 flex-1">
+   538→                          <span className="block text-[11px] font-bold leading-4 truncate" title={n.label}>{n.label}</span>
+   539→                          <span className="block text-[9.5px] text-muted-foreground leading-3.5 truncate" title={configSummary(n.kind, n.config)}>
+   540→                            {configSummary(n.kind, n.config)}
+   541→                          </span>
+   542→                        </span>
+   543→                      </div>
+   544→                      {/* نشان وضعیت */}
+   545→                      {st === 'success' && <span className="absolute -top-2 -left-2 h-5 w-5 rounded-full bg-emerald-500 grid place-items-center shadow"><CheckCircle2 className="h-3.5 w-3.5 text-white" /></span>}
+   546→                      {st === 'error' && <span className="absolute -top-2 -left-2 h-5 w-5 rounded-full bg-red-500 grid place-items-center shadow"><XCircle className="h-3.5 w-3.5 text-white" /></span>}
+   547→                      {st === 'skipped' && <span className="absolute -top-2 -left-2 h-5 w-5 rounded-full bg-zinc-400 dark:bg-zinc-600 grid place-items-center shadow"><SkipForward className="h-3 w-3 text-white" /></span>}
+   548→                    </div>
+   549→                    {/* پیام وضعیت زیر نود — علت خطا یا خروجی موفق */}
+   550→                    {msg && st === 'error' && (
+   551→                      <div dir="rtl" className="wf-node-msg wf-log-enter absolute top-full mt-1.5 w-[195px] rounded-lg bg-red-600 text-white text-[10px] leading-4 px-2 py-1.5 shadow-lg z-20">
+   552→                        ✗ {msg}
+   553→                      </div>
+   554→                    )}
+   555→                    {msg && st === 'success' && (
+   556→                      <div dir="rtl" className="wf-node-msg wf-log-enter absolute top-full mt-1.5 w-[195px] rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-[10px] leading-4 px-2 py-1.5 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 z-10">
+   557→                        ✓ {msg} <span className="opacity-60">({faNumber(Math.round((log.find(l => l.nodeId === n.id)?.durationMs || 0)))}ms)</span>
+   558→                      </div>
+   559→                    )}
+   560→                    {st === 'running' && (
+   561→                      <div dir="rtl" className="absolute top-full mt-1.5 rounded-lg bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 shadow wf-log-enter">در حال اجرا…</div>
+   562→                    )}
+   563→                    {st === 'skipped' && msg && (
+   564→                      <div dir="rtl" className="wf-node-msg wf-log-enter absolute top-full mt-1.5 w-[185px] rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-zinc-500 text-[10px] leading-4 px-2 py-1 dark:border-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 z-10">
+   565→                        {msg}
+   566→                      </div>
+   567→                    )}
+   568→                  </div>
+   569→                );
+   570→              })}
+   571→
+   572→              {/* حالت خالی */}
+   573→              {nodes.length === 0 && (
+   574→                <div dir="rtl" className="absolute inset-0 grid place-items-center">
+   575→                  <div className="rounded-2xl border-2 border-dashed bg-card/80 backdrop-blur p-6 text-center space-y-3 max-w-xs">
+   576→                    <GitBranch className="h-8 w-8 mx-auto text-muted-foreground" />
+   577→                    <div className="text-sm font-bold">بوم خالی است</div>
+   578→                    <div className="text-[11px] text-muted-foreground leading-5">گره «رویداد شروع» را از پالت اضافه کنید یا قالب آماده را بارگذاری کنید.</div>
+   579→                    <div className="flex gap-2 justify-center">
+   580→                      <Button size="sm" variant="outline" className="gap-1" onClick={() => addNode('trigger')}><Zap className="h-3.5 w-3.5" /> نود شروع</Button>
+   581→                      <Button size="sm" className="gap-1" onClick={loadSample}><Sparkles className="h-3.5 w-3.5" /> قالب نمونه</Button>
+   582→                    </div>
+   583→                  </div>
+   584→                </div>
+   585→              )}
+   586→            </div>
+   587→          </div>
+   588→
+   589→          {/* راهنمای رنگ‌ها */}
+   590→          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground px-1">
+   591→            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> موفق</span>
+   592→            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> خطا + نمایش علت</span>
+   593→            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> در حال اجرا</span>
+   594→            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-zinc-400" /> ردشده / اجرا نشده</span>
+   595→            <span>· هر گره در تست، واقعاً روی داده‌های زنده سامانه اجرا و بررسی می‌شود</span>
+   596→          </div>
+   597→        </div>
+   598→
+   599→        {/* ─── پنل تنظیمات ─── */}
+   600→        <div className="w-full lg:w-64 shrink-0 space-y-3">
+   601→          <div className="rounded-xl border bg-card shadow-sm p-3 min-h-[220px]">
+   602→            {!selNode && !selEdge && (
+   603→              <div className="text-center text-[11px] text-muted-foreground space-y-2 pt-8">
+   604→                <MousePointerClick className="h-6 w-6 mx-auto opacity-50" />
+   605→                <p>یک گره یا اتصال را روی بوم انتخاب کنید تا تنظیمات آن اینجا نمایش داده شود.</p>
+   606→              </div>
+   607→            )}
+   608→            {selNode && (() => {
+   609→              const def = KIND_DEFS[selNode.kind];
+   610→              const st = states[selNode.id];
+   611→              const msg = msgs[selNode.id];
+   612→              return (
+   613→                <div className="space-y-3" dir="rtl">
+   614→                  <div className="flex items-center gap-2">
+   615→                    <span className={`h-8 w-8 rounded-lg grid place-items-center ${def.tone}`}>{(() => { const I = KIND_ICON[selNode.kind]; return <I className="h-4 w-4" />; })()}</span>
+   616→                    <div>
+   617→                      <div className="text-xs font-bold">{def.fa}</div>
+   618→                      <div className="text-[10px] text-muted-foreground">{def.desc}</div>
+   619→                    </div>
+   620→                  </div>
+   621→                  <div className="space-y-1.5">
+   622→                    <Label className="text-[11px]">عنوان گره</Label>
+   623→                    <Input className="h-8 text-xs" value={selNode.label} onChange={e => { setNodes(ns => ns.map(x => x.id === selNode.id ? { ...x, label: e.target.value } : x)); touch(); }} />
+   624→                  </div>
+   625→                  {def.fields.map(fld => {
+   626→                    if (fld.showIf && selNode.config[fld.showIf.key] !== fld.showIf.equals) return null;
+   627→                    return (
+   628→                      <div key={fld.key} className="space-y-1.5">
+   629→                        <Label className="text-[11px]">{fld.label}{fld.required && ' *'}</Label>
+   630→                        {fld.type === 'select' ? (
+   631→                          <Select value={selNode.config[fld.key] || undefined} onValueChange={v => { setNodes(ns => ns.map(x => x.id === selNode.id ? { ...x, config: { ...x.config, [fld.key]: v } } : x)); touch(); }}>
+   632→                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="انتخاب کنید…" /></SelectTrigger>
+   633→                            <SelectContent>
+   634→                              {fld.options?.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+   635→                            </SelectContent>
+   636→                          </Select>
+   637→                        ) : (
+   638→                          <Input
+   639→                            className="h-8 text-xs"
+   640→                            type={fld.type === 'number' ? 'number' : 'text'}
+   641→                            value={selNode.config[fld.key] || ''}
+   642→                            placeholder={fld.placeholder}
+   643→                            onChange={e => { setNodes(ns => ns.map(x => x.id === selNode.id ? { ...x, config: { ...x.config, [fld.key]: e.target.value } } : x)); touch(); }}
+   644→                          />
+   645→                        )}
+   646→                      </div>
+   647→                    );
+   648→                  })}
+   649→                  {msg && (st === 'success' || st === 'error') && (
+   650→                    <div className={`rounded-lg text-[10.5px] leading-5 px-2.5 py-2 border ${st === 'error' ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-300' : 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300'}`}>
+   651→                      <b>خروجی تست:</b> {msg}
+   652→                    </div>
+   653→                  )}
+   654→                  <Button size="sm" variant="ghost" className="w-full text-red-600 h-7 text-xs gap-1" onClick={() => deleteNode(selNode.id)} disabled={running}>
+   655→                    <Trash2 className="h-3.5 w-3.5" /> حذف این گره
+   656→                  </Button>
+   657→                </div>
+   658→              );
+   659→            })()}
+   660→            {selEdge && (() => {
+   661→              const from = nodeById(selEdge.from), to = nodeById(selEdge.to);
+   662→              const fromNode = from ? KIND_DEFS[from.kind] : null;
+   663→              return (
+   664→                <div className="space-y-3" dir="rtl">
+   665→                  <div className="text-xs font-bold flex items-center gap-1.5"><Link2 /> اتصال</div>
+   666→                  <div className="text-[11px] leading-5 rounded-lg bg-muted p-2">
+   667→                    <b>{from?.label}</b> <span className="text-muted-foreground">({fromNode?.fa})</span>
+   668→                    <div className="my-1 text-center text-muted-foreground">↓</div>
+   669→                    <b>{to?.label}</b>
+   670→                  </div>
+   671→                  {from?.kind === 'condition' && (
+   672→                    <div className="space-y-1.5">
+   673→                      <Label className="text-[11px]">برچسب مسیر (برای شرط)</Label>
+   674→                      <Select value={selEdge.label || 'none'} onValueChange={v => { setEdges(es => es.map(x => x.id === selEdge.id ? { ...x, label: v === 'none' ? undefined : v } : x)); touch(); }}>
+   675→                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+   676→                        <SelectContent>
+   677→                          <SelectItem value="none">بدون برچسب</SelectItem>
+   678→                          <SelectItem value="بله">بله (شرط برقرار)</SelectItem>
+   679→                          <SelectItem value="خیر">خیر (شرط برقرار نیست)</SelectItem>
+   680→                        </SelectContent>
+   681→                      </Select>
+   682→                    </div>
+   683→                  )}
+   684→                  <Button size="sm" variant="ghost" className="w-full text-red-600 h-7 text-xs gap-1" onClick={() => deleteEdge(selEdge.id)} disabled={running}>
+   685→                    <Trash2 className="h-3.5 w-3.5" /> حذف این اتصال
+   686→                  </Button>
+   687→                </div>
+   688→              );
+   689→            })()}
+   690→          </div>
+   691→        </div>
+   692→      </div>
+   693→
+   694→      {/* ─── گزارش زنده اجرای تست ─── */}
+   695→      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+   696→        <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/40">
+   697→          <Activity className="h-3.5 w-3.5 text-primary" />
+   698→          <span className="text-xs font-bold">گزارش اجرای تست</span>
+   699→          {running && <span className="text-[10px] text-amber-600 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> در حال اجرا…</span>}
+   700→          {log.length > 0 && !running && (
+   701→            <Button size="sm" variant="ghost" className="h-6 text-[10px] ms-auto" onClick={() => { setLog([]); setStates({}); setMsgs({}); setSummary(null); }}>پاک کردن</Button>
+   702→          )}
+   703→        </div>
+   704→        <div ref={logRef} className="h-44 overflow-y-auto p-2 space-y-1">
+   705→          {log.length === 0 && (
+   706→            <div className="h-full grid place-items-center text-[11px] text-muted-foreground">
+   707→              دکمهٔ «تست فرایند» را بزنید تا اجرای گام‌به‌گام هر گره (موفق/خطا و علت آن) به‌صورت زنده اینجا ثبت شود.
+   708→            </div>
+   709→          )}
+   710→          {log.map((l, i) => {
+   711→            const iconMap = {
+   712→              success: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />,
+   713→              error: <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />,
+   714→              skipped: <SkipForward className="h-3.5 w-3.5 text-zinc-400 shrink-0" />,
+   715→              warning: <TriangleAlert className="h-3.5 w-3.5 text-amber-500 shrink-0" />,
+   716→            };
+   717→            return (
+   718→              <div key={i} className={`wf-log-enter flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] border ${l.status === 'error' ? 'bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/30' : l.status === 'success' ? 'bg-emerald-50/60 border-emerald-100 dark:bg-emerald-500/5 dark:border-emerald-500/20' : 'bg-muted/40 border-transparent'}`}>
+   719→                <span className="font-mono text-[9px] text-muted-foreground w-5 text-center">{faNumber(i + 1)}</span>
+   720→                {iconMap[l.status]}
+   721→                <b className="shrink-0 max-w-36 truncate" title={l.label}>{l.label}</b>
+   722→                <span className={`truncate flex-1 ${l.status === 'error' ? 'text-red-700 dark:text-red-300' : 'text-muted-foreground'}`} title={l.message}>{l.message}</span>
+   723→                {l.durationMs > 0 && <span className="shrink-0 font-mono text-[9px] text-muted-foreground">{faNumber(l.durationMs)}ms</span>}
+   724→              </div>
+   725→            );
+   726→          })}
+   727→        </div>
+   728→      </div>
+   729→    </div>
+   730→  );
+   731→}
+   732→
+   733→// ═══════════════════ فرآیندهای جاری (اجرای واقعی) ═══════════════════
+   734→const stageTone: Record<string, string> = {
+   735→  done: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
+   736→  in_progress: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+   737→  pending: 'bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-400 dark:border-zinc-500/30',
+   738→  rejected: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30',
+   739→};
+   740→const typeLabels: Record<string, string> = {
+   741→  purchase: 'خرید', repair: 'تعمیر', sale: 'فروش', rental: 'اجاره', custom: 'سفارشی',
+   742→};
+   743→
+   744→function RunningProcesses() {
+   745→  const { items: processes, loading, create, update } = useEntity<WorkflowProcess>('processes');
+   746→  const { toast } = useToast();
+   747→  const [open, setOpen] = useState(false);
+   748→  const [detailId, setDetailId] = useState<string | null>(null);
+   749→  const [form, setForm] = useState({ title: '', type: 'custom', responsible: '' });
+   750→  const [logNote, setLogNote] = useState('');
+   751→
+   752→  const detail = processes.find(p => p.id === detailId) || null;
+   753→
+   754→  const stats = {
+   755→    total: processes.length,
+   756→    active: processes.filter(p => p.currentStageIndex < p.stages.length - 1).length,
+   757→    stuck: processes.filter(p => p.stages[p.currentStageIndex]?.status === 'in_progress' && p.stages.filter(s => s.status === 'done').length > 0).length,
+   758→  };
+   759→
+   760→  async function handleAdd() {
+   761→    if (!form.title || !form.responsible) {
+   762→      toast({ title: 'عنوان فرآیند و مسئول اولین مرحله الزامی است', variant: 'destructive' });
+   763→      return;
+   764→    }
+   765→    await create({
+   766→      code: `WF-${6000 + processes.length + 1}`,
+   767→      type: form.type as WorkflowProcess['type'], title: form.title,
+   768→      currentStageIndex: 0, createdBy: 'کاربر سیستم',
+   769→      createdAt: new Date().toISOString(),
+   770→      stages: [
+   771→        { name: 'شروع فرآیند', responsible: form.responsible, status: 'in_progress', startedAt: new Date().toISOString(), logs: [{ at: new Date().toISOString(), by: 'کاربر سیستم', action: 'فرآیند ایجاد شد' }] },
+   772→        { name: 'بررسی و تأیید', responsible: 'مدیرعامل', status: 'pending', logs: [] },
+   773→        { name: 'اجرا', responsible: form.responsible, status: 'pending', logs: [] },
+   774→        { name: 'کنترل و بستن', responsible: 'مدیرعامل', status: 'pending', logs: [] },
+   775→      ],
+   776→    } as Partial<WorkflowProcess>);
+   777→    setForm({ title: '', type: 'custom', responsible: '' });
+   778→    setOpen(false);
+   779→    toast({ title: 'فرآیند جدید ایجاد شد' });
+   780→  }
+   781→
+   782→  async function advance(p: WorkflowProcess) {
+   783→    const stages = [...p.stages];
+   784→    stages[p.currentStageIndex] = {
+   785→      ...stages[p.currentStageIndex], status: 'done', completedAt: new Date().toISOString(),
+   786→      logs: [...stages[p.currentStageIndex].logs, { at: new Date().toISOString(), by: 'کاربر سیستم', action: 'مرحله تکمیل شد' }],
+   787→    };
+   788→    const nextIdx = p.currentStageIndex + 1;
+   789→    if (nextIdx < stages.length) {
+   790→      stages[nextIdx] = { ...stages[nextIdx], status: 'in_progress', startedAt: new Date().toISOString() };
+   791→    }
+   792→    await update({ id: p.id, stages, currentStageIndex: Math.min(nextIdx, stages.length - 1) });
+   793→    if (nextIdx >= stages.length - 1) {
+   794→      await update({ id: p.id, currentStageIndex: stages.length - 1 });
+   795→      stages[stages.length - 1] = { ...stages[stages.length - 1], status: 'done', completedAt: new Date().toISOString() };
+   796→      await update({ id: p.id, stages });
+   797→      toast({ title: 'فرآیند کامل شد ✓', description: p.title });
+   798→    } else {
+   799→      toast({ title: 'مرحله پیشرفت کرد', description: `${p.title} → ${stages[nextIdx].name}` });
+   800→    }
+   801→  }
+   802→
+   803→  async function rejectStage(p: WorkflowProcess) {
+   804→    const note = window.prompt('دلیل رد مرحله:') || '';
+   805→    const stages = [...p.stages];
+   806→    stages[p.currentStageIndex] = {
+   807→      ...stages[p.currentStageIndex], status: 'rejected',
+   808→      logs: [...stages[p.currentStageIndex].logs, { at: new Date().toISOString(), by: 'کاربر سیستم', action: 'مرحله رد شد', note }],
+   809→    };
+   810→    await update({ id: p.id, stages });
+   811→    toast({ title: 'مرحله رد شد', variant: 'destructive' });
+   812→  }
+   813→
+   814→  async function addLog(p: WorkflowProcess) {
+   815→    if (!logNote.trim()) return;
+   816→    const stages = [...p.stages];
+   817→    stages[p.currentStageIndex] = {
+   818→      ...stages[p.currentStageIndex],
+   819→      logs: [...stages[p.currentStageIndex].logs, { at: new Date().toISOString(), by: 'کاربر سیستم', action: 'یادداشت', note: logNote }],
+   820→    };
+   821→    await update({ id: p.id, stages });
+   822→    setLogNote('');
+   823→    toast({ title: 'یادداشت در لاگ فرآیند ثبت شد' });
+   824→  }
+   825→
+   826→  return (
+   827→    <div className="space-y-4">
+   828→      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+   829→        <KpiCard title="کل فرآیندها" value={faNumber(stats.total)} icon={GitBranch} tone="amber" />
+   830→        <KpiCard title="فرآیندهای جاری" value={faNumber(stats.active)} icon={ArrowLeft} tone="teal" />
+   831→        <KpiCard title="در جریان اجرا" value={faNumber(stats.stuck)} sub="مرحله فعال" icon={History} tone="zinc" />
+   832→      </div>
+   833→
+   834→      {loading ? <LoadingTable rows={4} /> : (
+   835→        <div className="space-y-4">
+   836→          {processes.map(p => (
+   837→            <div key={p.id} className="rounded-xl border bg-card shadow-sm p-4">
+   838→              <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+   839→                <div>
+   840→                  <div className="flex items-center gap-2">
+   841→                    <span className="font-mono text-[11px] text-muted-foreground" dir="ltr">{p.code}</span>
+   842→                    <StatusPill label={typeLabels[p.type]} />
+   843→                  </div>
+   844→                  <div className="text-sm font-bold mt-1">{p.title}</div>
+   845→                  <div className="text-[11px] text-muted-foreground mt-0.5">
+   846→                    ایجاد: {p.createdBy} · {jdate(p.createdAt)} {p.relatedRef && `· مرجع: ${p.relatedRef}`}
+   847→                  </div>
+   848→                </div>
+   849→                <div className="flex items-center gap-1.5">
+   850→                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setDetailId(p.id)}>جزئیات و لاگ</Button>
+   851→                  {p.currentStageIndex < p.stages.length - 1 && (
+   852→                    <>
+   853→                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => advance(p)}>تکمیل مرحله <ArrowLeft className="h-3 w-3" /></Button>
+   854→                      <Button size="sm" variant="ghost" className="h-7 text-xs text-red-600" onClick={() => rejectStage(p)}><CircleX className="h-3.5 w-3.5" /></Button>
+   855→                    </>
+   856→                  )}
+   857→                </div>
+   858→              </div>
+   859→              {/* استپر مراحل */}
+   860→              <div className="flex items-start overflow-x-auto gap-1 pb-1">
+   861→                {p.stages.map((s, i) => (
+   862→                  <div key={i} className="flex items-center gap-1 shrink-0">
+   863→                    <div className={`rounded-lg border px-2.5 py-1.5 min-w-24 text-center ${i === p.currentStageIndex ? 'ring-2 ring-amber-300' : ''}`}>
+   864→                      <div className="text-[10px] text-muted-foreground mb-0.5">{faNumber(i + 1)}</div>
+   865→                      <div className="text-[11px] font-medium whitespace-nowrap">{s.name}</div>
+   866→                      <div className="mt-1"><StatusPill label={s.responsible} tone={stageTone[s.status]} /></div>
+   867→                    </div>
+   868→                    {i < p.stages.length - 1 && <div className="h-px w-4 bg-border mt-6" />}
+   869→                  </div>
+   870→                ))}
+   871→              </div>
+   872→            </div>
+   873→          ))}
+   874→        </div>
+   875→      )}
+   876→
+   877→      {/* فرآیند جدید */}
+   878→      <FormDialog open={open} onOpenChange={setOpen} title="ایجاد فرآیند جدید" description="قالب چهارمرحله‌ای: شروع → تأیید → اجرا → کنترل">
+   879→        <div className="space-y-3">
+   880→          <div className="space-y-1.5"><Label>عنوان فرآیند *</Label><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="مثلاً: فرآیند آماده‌سازی خودرو برای فروش" /></div>
+   881→          <div className="space-y-1.5">
+   882→            <Label>نوع</Label>
+   883→            <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
+   884→              <SelectTrigger><SelectValue /></SelectTrigger>
+   885→              <SelectContent>
+   886→                {Object.entries(typeLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+   887→              </SelectContent>
+   888→            </Select>
+   889→          </div>
+   890→          <div className="space-y-1.5"><Label>مسئول مرحله اول *</Label><Input value={form.responsible} onChange={e => setForm({ ...form, responsible: e.target.value })} /></div>
+   891→        </div>
+   892→        <div className="flex justify-end gap-2 mt-4">
+   893→          <Button variant="outline" onClick={() => setOpen(false)}>انصراف</Button>
+   894→          <Button onClick={handleAdd}>ایجاد فرآیند</Button>
+   895→        </div>
+   896→      </FormDialog>
+   897→
+   898→      {/* جزئیات و لاگ */}
+   899→      <DetailDrawer open={!!detail} onOpenChange={v => !v && setDetailId(null)} title={detail ? `${detail.code} — ${detail.title}` : ''} description={detail ? `مرحله ${faNumber(detail.currentStageIndex + 1)} از ${faNumber(detail.stages.length)}` : ''}>
+   900→        {detail && (
+   901→          <div className="space-y-4">
+   902→            <div className="space-y-2">
+   903→              {detail.stages.map((s, i) => (
+   904→                <div key={i} className={`rounded-xl border p-3 ${i === detail.currentStageIndex ? 'border-amber-300 bg-amber-50/40 dark:border-amber-500/40 dark:bg-amber-500/10' : ''}`}>
+   905→                  <div className="flex items-center justify-between gap-2">
+   906→                    <div className="text-sm font-bold">{faNumber(i + 1)}. {s.name}</div>
+   907→                    <StatusPill label={s.status === 'done' ? 'تکمیل' : s.status === 'in_progress' ? 'در جریان' : s.status === 'rejected' ? 'رد شده' : 'در انتظار'} tone={stageTone[s.status]} />
+   908→                  </div>
+   909→                  <div className="text-[11px] text-muted-foreground mt-1">
+   910→                    مسئول: {s.responsible}
+   911→                    {s.startedAt && ` · شروع: ${jdatetime(s.startedAt)}`}
+   912→                    {s.completedAt && ` · پایان: ${jdatetime(s.completedAt)}`}
+   913→                  </div>
+   914→                  {s.logs.length > 0 && (
+   915→                    <div className="mt-2 space-y-1 border-t pt-2">
+   916→                      {s.logs.map((l, j) => (
+   917→                        <div key={j} className="text-[11px] text-muted-foreground">
+   918→                          <b className="text-foreground">{l.action}</b> — {l.by} · {jdatetime(l.at)}{l.note ? ` — ${l.note}` : ''}
+   919→                        </div>
+   920→                      ))}
+   921→                    </div>
+   922→                  )}
+   923→                </div>
+   924→              ))}
+   925→            </div>
+   926→            <div className="flex gap-2">
+   927→              <Input value={logNote} onChange={e => setLogNote(e.target.value)} placeholder="یادداشت برای مرحله جاری..." className="flex-1" />
+   928→              <Button onClick={() => addLog(detail)}>ثبت در لاگ</Button>
+   929→            </div>
+   930→          </div>
+   931→        )}
+   932→      </DetailDrawer>
+   933→    </div>
+   934→  );
+   935→}
+   936→
+   937→// ═══════════════════ نمای اصلی ═══════════════════
+   938→export default function WorkflowView() {
+   939→  return (
+   940→    <div className="view-enter">
+   941→      <PageHeader
+   942→        title="اتوماسیون فرآیندها"
+   943→        description="طراح گرافیکی زنده فرآیند — بکشید، وصل کنید، تست بگیرید؛ هر گره واقعاً اجرا و نتیجه سبز/قرمز با علت خطا نمایش داده می‌شود"
+   944→      />
+   945→      <Tabs defaultValue="designer" className="mt-4">
+   946→        <TabsList className="mb-3">
+   947→          <TabsTrigger value="designer" className="gap-1.5"><GitBranch className="h-3.5 w-3.5" /> طراح گرافیکی فرآیند</TabsTrigger>
+   948→          <TabsTrigger value="running" className="gap-1.5"><History className="h-3.5 w-3.5" /> فرآیندهای جاری</TabsTrigger>
+   949→        </TabsList>
+   950→        <TabsContent value="designer"><FlowDesigner /></TabsContent>
+   951→        <TabsContent value="running"><RunningProcesses /></TabsContent>
+   952→      </Tabs>
+   953→    </div>
+   954→  );
+   955→}
+   956→

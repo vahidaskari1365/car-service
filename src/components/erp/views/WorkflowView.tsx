@@ -508,7 +508,8 @@ function FlowDesigner() {
                 const msg = msgs[n.id];
                 const isSel = selectedNode === n.id;
                 const box = [
-                  'wf-node absolute rounded-xl border-2 bg-card shadow-md cursor-grab active:cursor-grabbing',
+                  // ⚠️ باید relative بماند: اگر absolute باشد ارتفاع والده صفر می‌شود و پیام‌های وضعیت روی خود نود می‌افتند
+                  'wf-node relative rounded-xl border-2 bg-card shadow-md cursor-grab active:cursor-grabbing',
                   st === 'running' && 'border-amber-400 ring-2 ring-amber-300/70 wf-running',
                   st === 'success' && 'border-emerald-500 ring-2 ring-emerald-400/60 wf-pop',
                   st === 'error' && 'border-red-500 ring-2 ring-red-400/60 wf-shake',
@@ -548,12 +549,12 @@ function FlowDesigner() {
                     </div>
                     {/* پیام وضعیت زیر نود — علت خطا یا خروجی موفق */}
                     {msg && st === 'error' && (
-                      <div dir="rtl" className="wf-node-msg wf-log-enter absolute top-full mt-1.5 w-[195px] rounded-lg bg-red-600 text-white text-[10px] leading-4 px-2 py-1.5 shadow-lg z-20">
+                      <div dir="rtl" title={msg} className="wf-node-msg wf-log-enter absolute top-full mt-1.5 w-full rounded-lg bg-red-600 text-white text-[10px] leading-4 px-2 py-1.5 shadow-lg z-30 line-clamp-3">
                         ✗ {msg}
                       </div>
                     )}
                     {msg && st === 'success' && (
-                      <div dir="rtl" className="wf-node-msg wf-log-enter absolute top-full mt-1.5 w-[195px] rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-[10px] leading-4 px-2 py-1.5 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 z-10">
+                      <div dir="rtl" title={msg} className="wf-node-msg wf-log-enter absolute top-full mt-1.5 w-full rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-[10px] leading-4 px-2 py-1.5 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 z-10 line-clamp-2">
                         ✓ {msg} <span className="opacity-60">({faNumber(Math.round((log.find(l => l.nodeId === n.id)?.durationMs || 0)))}ms)</span>
                       </div>
                     )}
@@ -561,7 +562,7 @@ function FlowDesigner() {
                       <div dir="rtl" className="absolute top-full mt-1.5 rounded-lg bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 shadow wf-log-enter">در حال اجرا…</div>
                     )}
                     {st === 'skipped' && msg && (
-                      <div dir="rtl" className="wf-node-msg wf-log-enter absolute top-full mt-1.5 w-[185px] rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-zinc-500 text-[10px] leading-4 px-2 py-1 dark:border-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 z-10">
+                      <div dir="rtl" title={msg} className="wf-node-msg wf-log-enter absolute top-full mt-1.5 w-full rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-zinc-500 text-[10px] leading-4 px-2 py-1 dark:border-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 z-10 line-clamp-2">
                         {msg}
                       </div>
                     )}
